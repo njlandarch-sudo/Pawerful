@@ -108,28 +108,243 @@ const generateShareCard = async (pet, petImage) => {
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = 1080; canvas.height = 1920;
-    const gradient = ctx.createLinearGradient(0, 0, 0, 1920);
-    gradient.addColorStop(0, '#FDF6EC');
-    gradient.addColorStop(1, '#E8C9A0');
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1920);
-    ctx.fillStyle = '#3D3530'; ctx.font = 'bold 72px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText("PAWERFUL VIBE CHECK", 540, 180);
-    const img = new Image(); img.src = petImage;
-    await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
+    const W = 900, H = 1200;
+    canvas.width = W; canvas.height = H;
+
+    // Background gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+    bgGrad.addColorStop(0, '#FDF6EC');
+    bgGrad.addColorStop(0.5, '#F5EDE0');
+    bgGrad.addColorStop(1, '#EDD9C0');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Decorative circles
+    ctx.fillStyle = 'rgba(232, 168, 124, 0.12)';
+    ctx.beginPath(); ctx.arc(W - 80, 80, 160, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(123, 174, 138, 0.10)';
+    ctx.beginPath(); ctx.arc(60, H - 100, 200, 0, Math.PI * 2); ctx.fill();
+
+    // Card border/shadow effect
+    ctx.shadowColor = 'rgba(180, 120, 80, 0.15)';
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    drawRoundedRect(ctx, 40, 40, W - 80, H - 80, 48);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    // Card border
+    ctx.strokeStyle = 'rgba(237, 227, 216, 0.9)';
+    ctx.lineWidth = 2;
+    drawRoundedRect(ctx, 40, 40, W - 80, H - 80, 48);
+    ctx.stroke();
+
+    // Header bar
+    const headerGrad = ctx.createLinearGradient(40, 40, W - 40, 40);
+    headerGrad.addColorStop(0, '#C4714A');
+    headerGrad.addColorStop(1, '#E8A87C');
+    ctx.fillStyle = headerGrad;
+    ctx.beginPath();
+    ctx.moveTo(88, 40); ctx.lineTo(W - 88, 40);
+    ctx.quadraticCurveTo(W - 40, 40, W - 40, 88);
+    ctx.lineTo(W - 40, 175);
+    ctx.lineTo(40, 175);
+    ctx.lineTo(40, 88);
+    ctx.quadraticCurveTo(40, 40, 88, 40);
+    ctx.closePath();
+    ctx.fill();
+
+    // PAWERFUL logo text
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = 'bold 28px Georgia, serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('🐾 PAWERFUL', 78, 95);
+    ctx.font = '16px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText('PET IDENTITY CARD', 78, 125);
+
+    // ID badge on right
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    drawRoundedRect(ctx, W - 190, 65, 135, 85, 16);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PET ID', W - 122, 96);
+    ctx.font = 'bold 28px Courier New, monospace';
+    ctx.fillText(`#${pet.stableId || '----'}`, W - 122, 130);
+
+    // Pet photo - circular
+    const photoSize = 220;
+    const photoX = 78, photoY = 200;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = petImage;
+    await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; setTimeout(resolve, 3000); });
+
+    // Photo shadow
+    ctx.shadowColor = 'rgba(180, 120, 80, 0.3)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 8;
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    // Clip and draw photo
     ctx.save();
-    drawRoundedRect(ctx, 140, 260, 800, 800, 60);
-    ctx.clip(); ctx.drawImage(img, 140, 260, 800, 800); ctx.restore();
-    ctx.font = 'bold 110px sans-serif'; ctx.fillStyle = '#3D3530';
-    ctx.fillText((pet.mode || "Cool Pet").toUpperCase(), 540, 1220);
-    ctx.font = '48px sans-serif'; ctx.fillStyle = '#9B8E85';
-    ctx.fillText(`${pet.name || "Unknown"}'s Vibe Card`, 540, 1300);
+    ctx.beginPath();
+    ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, photoX, photoY, photoSize, photoSize);
+    ctx.restore();
+
+    // Vibe badge on photo
+    const vibeColors = { zoom: '#E05A5A', chill: '#5B8DB8', sleep: '#5B8DB8', love: '#D47A8A', happy: '#D47A8A', sass: '#C4914A', judge: '#C4914A' };
+    let vibeColor = '#6A9E7A';
+    const modeL = (pet.mode || '').toLowerCase();
+    Object.keys(vibeColors).forEach(k => { if (modeL.includes(k)) vibeColor = vibeColors[k]; });
+
+    ctx.fillStyle = vibeColor;
+    drawRoundedRect(ctx, photoX, photoY + photoSize - 48, photoSize, 48, 24);
+    ctx.fill();
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 18px Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText((pet.mode || 'Unknown Vibe').toUpperCase().slice(0, 22), photoX + photoSize / 2, photoY + photoSize - 20);
+
+    // Pet info section - right of photo
+    const infoX = 330, infoY = 215;
+    ctx.textAlign = 'left';
+
+    ctx.font = 'bold 11px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#9B8E85';
+    ctx.fillText('NAME', infoX, infoY);
+    ctx.font = 'bold 38px Georgia, serif';
+    ctx.fillStyle = '#3D3530';
+    ctx.fillText(pet.name || 'Unknown', infoX, infoY + 38);
+
+    ctx.font = 'bold 11px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#9B8E85';
+    ctx.fillText('BREED', infoX, infoY + 70);
+    ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#5A4A40';
+    ctx.fillText(pet.breed || 'Unknown', infoX, infoY + 95);
+
+    // Details grid
+    const details = [
+      { label: 'AGE', value: (pet.details?.age || '?') + ' yrs' },
+      { label: 'GENDER', value: pet.details?.gender || 'Pet' },
+      { label: 'HUMANS', value: pet.humanSafe === 'green' ? 'Friendly ✓' : 'Cautious' },
+      { label: 'DOGS', value: pet.dogSafe === 'green' ? 'Chill ✓' : 'Reactive' },
+    ];
+    details.forEach((d, i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      const dx = infoX + col * 220, dy = infoY + 120 + row * 65;
+      ctx.font = 'bold 10px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = '#9B8E85';
+      ctx.fillText(d.label, dx, dy);
+      ctx.font = 'bold 17px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = '#3D3530';
+      ctx.fillText(d.value, dx, dy + 22);
+    });
+
+    // Stats section
+    const statsY = 460;
+    ctx.fillStyle = '#F5EDE0';
+    drawRoundedRect(ctx, 78, statsY, W - 156, 140, 24);
+    ctx.fill();
+    ctx.strokeStyle = '#EDE3D8';
+    ctx.lineWidth = 1.5;
+    drawRoundedRect(ctx, 78, statsY, W - 156, 140, 24);
+    ctx.stroke();
+
+    ctx.font = 'bold 11px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#9B8E85';
+    ctx.textAlign = 'center';
+    ctx.fillText('PET STATS', W / 2, statsY + 28);
+
+    const stats = pet.stats && pet.stats.length > 0 ? pet.stats : [
+      { label: 'Vibe', value: 85 }, { label: 'Sass', value: 70 }, { label: 'Energy', value: 60 }
+    ];
+    const statSpacing = (W - 156) / stats.length;
+    stats.forEach((stat, i) => {
+      const sx = 78 + statSpacing * i + statSpacing / 2;
+      // Bar
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      drawRoundedRect(ctx, sx - 30, statsY + 50, 60, 14, 7);
+      ctx.fill();
+      ctx.fillStyle = vibeColor;
+      const barW = Math.max(8, (stat.value / 100) * 60);
+      drawRoundedRect(ctx, sx - 30, statsY + 50, barW, 14, 7);
+      ctx.fill();
+      ctx.font = 'bold 18px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = '#3D3530';
+      ctx.fillText(stat.value, sx, statsY + 105);
+      ctx.font = 'bold 10px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = '#9B8E85';
+      ctx.fillText(stat.label.toUpperCase(), sx, statsY + 122);
+    });
+
+    // Diary section
+    if (pet.diary) {
+      const diaryY = statsY + 160;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      drawRoundedRect(ctx, 78, diaryY, W - 156, 120, 20);
+      ctx.fill();
+      ctx.font = 'italic bold 15px Georgia, serif';
+      ctx.fillStyle = '#5A4A40';
+      ctx.textAlign = 'left';
+      const diaryText = `"${pet.diary}"`;
+      // Word wrap
+      const maxW = W - 200;
+      const words = diaryText.split(' ');
+      let line = '', lineY = diaryY + 30;
+      words.forEach(word => {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxW && line) {
+          ctx.fillText(line, 98, lineY);
+          line = word + ' ';
+          lineY += 26;
+        } else {
+          line = testLine;
+        }
+      });
+      if (lineY < diaryY + 110) ctx.fillText(line, 98, lineY);
+    }
+
+    // Footer CTA
+    const footerY = H - 175;
+    const ctaGrad = ctx.createLinearGradient(78, footerY, W - 78, footerY);
+    ctaGrad.addColorStop(0, '#C4714A');
+    ctaGrad.addColorStop(1, '#E8A87C');
+    ctx.fillStyle = ctaGrad;
+    drawRoundedRect(ctx, 78, footerY, W - 156, 80, 40);
+    ctx.fill();
+    ctx.font = 'bold 22px Georgia, serif';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾 Try Pawerful — Scan Your Pet\'s Vibe', W / 2, footerY + 34);
+    ctx.font = 'bold 13px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('pawerful.app', W / 2, footerY + 58);
+
+    // Date watermark
+    ctx.font = '12px Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#C4B8B0';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, W / 2, H - 60);
+
     const link = document.createElement('a');
-    link.download = `pawerful-${pet.name || 'pet'}.png`;
-    link.href = canvas.toDataURL('image/png'); link.click();
+    link.download = `pawerful-id-${pet.name || 'pet'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   } catch (e) {
     console.error("Share failed", e);
-    alert("Could not generate image. Please try again.");
+    alert("Could not generate card. Please try again.");
   }
 };
 
@@ -486,8 +701,161 @@ const TimelineEntry = ({ entry, isLast, onDelete }) => {
   );
 };
 
-// Empty state for Journey
-const JourneyEmptyState = ({ onAdd }) => (
+// Duolingo-style Daily Check-in Modal
+const CheckInModal = ({ onClose, streak, onComplete, todaysPet }) => {
+  const [phase, setPhase] = useState('question'); // question | success
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const moods = [
+    { id: 'zoomies', emoji: '⚡', label: 'ZOOMIES', color: '#E05A5A', bg: '#FEE2E2' },
+    { id: 'chill', emoji: '😴', label: 'CHILL', color: '#5B8DB8', bg: '#EEF4FB' },
+    { id: 'hungry', emoji: '🍗', label: 'HUNGRY', color: '#C4914A', bg: '#FEF3E2' },
+    { id: 'cuddly', emoji: '🥰', label: 'CUDDLY', color: '#D47A8A', bg: '#FEF0F3' },
+    { id: 'sass', emoji: '😒', label: 'SIDE-EYE', color: '#7BAE8A', bg: '#EEF7F1' },
+    { id: 'playful', emoji: '🎾', label: 'PLAYFUL', color: '#E8A87C', bg: '#FEF6EE' },
+  ];
+
+  const handleMoodSelect = (mood) => {
+    setSelectedMood(mood);
+    setTimeout(() => {
+      setPhase('success');
+      setShowConfetti(true);
+    }, 400);
+  };
+
+  const xpAmount = streak > 0 ? Math.min(10 + streak * 2, 50) : 10;
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="absolute inset-0 z-[80] flex items-end justify-center"
+      style={{ background: 'rgba(30,15,5,0.6)', backdropFilter: 'blur(12px)' }}
+      onClick={phase === 'success' ? onClose : undefined}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={smoothSpring}
+        onClick={e => e.stopPropagation()}
+        className="w-full rounded-t-[36px] overflow-hidden"
+        style={{ background: COLORS.cream, maxHeight: '85%' }}>
+
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full opacity-25" style={{ background: COLORS.slate }}></div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {phase === 'question' && (
+            <motion.div key="question" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              className="px-6 pb-10 pt-2">
+              {/* Streak display */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-2xl font-black" style={{ color: COLORS.slate }}>Daily Check-in</h2>
+                  <p className="text-sm font-semibold mt-0.5" style={{ color: COLORS.muted }}>
+                    {todaysPet ? `How's ${todaysPet} doing today?` : "How's your pet feeling?"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center px-4 py-2 rounded-2xl"
+                  style={{ background: streak > 0 ? '#FEF3E2' : '#F5EDE0', border: `2px solid ${streak > 0 ? '#FDDFA0' : '#EDE3D8'}` }}>
+                  <Fire weight="fill" className="w-5 h-5 mb-0.5" style={{ color: streak > 0 ? '#E8703A' : '#C4B8B0' }} />
+                  <span className="font-black text-xl leading-none" style={{ color: streak > 0 ? '#C4714A' : COLORS.muted }}>{streak}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>streak</span>
+                </div>
+              </div>
+
+              {/* XP reward preview */}
+              <div className="flex items-center gap-2 mb-5 px-4 py-3 rounded-2xl"
+                style={{ background: 'linear-gradient(135deg, #FEF3E2, #FDF6EC)', border: '1.5px solid #FDDFA0' }}>
+                <Star weight="fill" className="w-4 h-4" style={{ color: '#C4914A' }} />
+                <span className="font-black text-sm" style={{ color: '#C4914A' }}>+{xpAmount} XP for checking in today!</span>
+                <Lightning weight="fill" className="w-3.5 h-3.5 ml-auto" style={{ color: '#E8A87C' }} />
+              </div>
+
+              <p className="text-[10px] font-black uppercase tracking-widest mb-4" style={{ color: COLORS.muted }}>Pick today's vibe</p>
+
+              <div className="grid grid-cols-3 gap-3">
+                {moods.map((mood) => (
+                  <motion.button key={mood.id}
+                    whileTap={{ scale: 0.88 }}
+                    onClick={() => handleMoodSelect(mood)}
+                    className="flex flex-col items-center gap-2 p-4 rounded-[20px] transition-all"
+                    style={{
+                      background: selectedMood?.id === mood.id ? mood.bg : COLORS.cardBg,
+                      border: `2px solid ${selectedMood?.id === mood.id ? mood.color : '#EDE3D8'}`,
+                      boxShadow: selectedMood?.id === mood.id ? `0 4px 16px -4px ${mood.color}50` : 'none'
+                    }}>
+                    <span className="text-3xl">{mood.emoji}</span>
+                    <span className="font-black text-[10px] uppercase tracking-wider" style={{ color: mood.color }}>{mood.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {phase === 'success' && (
+            <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              className="px-6 pb-10 pt-4 flex flex-col items-center text-center">
+              {/* Big celebration */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: [0, 1.3, 1] }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="w-28 h-28 rounded-full flex items-center justify-center mb-4"
+                style={{ background: `linear-gradient(135deg, ${selectedMood?.bg || '#FEF3E2'}, ${COLORS.cardBg})`, border: `3px solid ${selectedMood?.color || COLORS.terracotta}` }}>
+                <span className="text-5xl">{selectedMood?.emoji || '🐾'}</span>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <h2 className="font-display text-3xl font-black mb-1" style={{ color: COLORS.slate }}>
+                  {streak >= 7 ? 'ON FIRE! 🔥' : streak >= 3 ? 'Keep it up!' : 'Great job!'}
+                </h2>
+                <p className="text-base font-semibold mb-5" style={{ color: COLORS.muted }}>
+                  {selectedMood?.label} vibes logged for today
+                </p>
+              </motion.div>
+
+              {/* XP pill */}
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+                className="flex items-center gap-2 px-6 py-3 rounded-full mb-5"
+                style={{ background: 'linear-gradient(135deg, #C4714A, #E8A87C)', boxShadow: '0 6px 24px -6px rgba(196,113,74,0.5)' }}>
+                <Lightning weight="fill" className="w-5 h-5 text-white" />
+                <span className="font-black text-lg text-white">+{xpAmount} XP earned!</span>
+              </motion.div>
+
+              {/* Streak card */}
+              <div className="w-full p-4 rounded-[24px] mb-6 flex items-center gap-4"
+                style={{ background: '#FEF3E2', border: '2px solid #FDDFA0' }}>
+                <div className="flex flex-col items-center">
+                  <Fire weight="fill" className="w-8 h-8" style={{ color: '#E8703A' }} />
+                  <span className="font-black text-2xl leading-none mt-1" style={{ color: '#C4714A' }}>{streak}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>day streak</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm mb-1" style={{ color: COLORS.slate }}>
+                    {streak === 1 ? 'First day! 🎉' : streak >= 7 ? `${streak} days — you're a legend!` : `${streak} days in a row!`}
+                  </p>
+                  <p className="text-xs font-semibold" style={{ color: COLORS.muted }}>
+                    {streak >= 7 ? 'Keep this streak alive!' : `${7 - streak} more days for a weekly badge`}
+                  </p>
+                  {/* Progress bar */}
+                  <div className="mt-2 h-2 rounded-full overflow-hidden" style={{ background: '#FDDFA0' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((streak / 7) * 100, 100)}%` }}
+                      transition={{ delay: 0.4, duration: 0.6 }}
+                      className="h-full rounded-full" style={{ background: '#E8703A' }} />
+                  </div>
+                </div>
+              </div>
+
+              <motion.button whileTap={tapAnimation} onClick={onComplete}
+                className="w-full py-4 rounded-full font-black text-white text-base"
+                style={{ background: 'linear-gradient(135deg, #C4714A, #E8A87C)', boxShadow: '0 4px 20px -6px rgba(196,113,74,0.5)' }}>
+                Continue 🐾
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+};
   <div className="flex flex-col items-center justify-center py-16 px-6">
     <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
       className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
@@ -750,9 +1118,7 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
     setTimeout(() => setShowToast(false), 2200);
   };
   const toggle = (target) => {
-    if (!readonly) {
-      setActiveState(prev => prev === target ? 'none' : target);
-    }
+    setActiveState(prev => prev === target ? 'none' : target);
   };
 
   return (
@@ -991,7 +1357,7 @@ const AvatarEditorModal = ({ image, onClose, onSave }) => {
   );
 };
 
-const Header = ({ mode, onModeSwitch, streak, checkedInToday }) => (
+const Header = ({ mode, onModeSwitch, streak, checkedInToday, onStreakClick }) => (
   <div className="flex justify-between items-center w-full">
     <div className="flex items-center gap-2.5">
       <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-lg shadow-md transition-colors duration-500"
@@ -1001,13 +1367,14 @@ const Header = ({ mode, onModeSwitch, streak, checkedInToday }) => (
       <span className="font-black text-lg tracking-tight" style={{ color: '#3D3530', fontFamily: 'Fraunces, serif' }}>Pawerful</span>
     </div>
     <div className="flex items-center gap-2">
-      <div className="px-3 py-1.5 rounded-full flex items-center gap-1.5"
-        style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid #EDE3D8' }}>
+      <motion.button whileTap={tapAnimation} onClick={onStreakClick}
+        className="px-3 py-1.5 rounded-full flex items-center gap-1.5 active:scale-95 transition-transform"
+        style={{ background: checkedInToday ? '#FEF3E2' : 'rgba(255,255,255,0.8)', border: `1px solid ${checkedInToday ? '#FDDFA0' : '#EDE3D8'}` }}>
         <Fire weight="fill" className="w-3.5 h-3.5" style={{ color: streak > 0 ? '#E8703A' : '#C4B8B0' }} />
         <span className="text-[10px] font-black" style={{ color: '#5A4A40' }}>
-          {streak} {checkedInToday ? 'Day' : 'Day'}
+          {streak} {checkedInToday ? '✓' : 'Check in'}
         </span>
-      </div>
+      </motion.button>
       <div className="p-0.5 rounded-full flex" style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid #EDE3D8' }}>
         <button onClick={() => onModeSwitch('cat')}
           className="px-2.5 py-1 rounded-full text-[10px] font-bold transition-all"
@@ -1398,7 +1765,7 @@ const MyPage = ({ savedPets, userProfile, setUserProfile }) => {
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-hide pt-20 px-6 pb-10">
                 <PetNameCard image={viewingPet.image} petData={viewingPet} details={viewingPet.details}
-                  onSave={() => {}} readonly={true} initialState="none" />
+                  onSave={() => {}} readonly={true} initialState="details" />
               </div>
             </motion.div>
           </motion.div>
@@ -1419,6 +1786,7 @@ export default function App() {
   const [streak, setStreak] = useState(0);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -1591,7 +1959,7 @@ export default function App() {
   };
 
   const handleSavePet = (petData) => {
-    const stableId = Math.floor(Math.random() * 9000) + 1000;
+    const stableId = petData.stableId || (Math.floor(Math.random() * 9000) + 1000);
     setSavedPets([{
       id: Date.now(),
       stableId,
@@ -1609,8 +1977,14 @@ export default function App() {
     setView('profile');
   };
 
-  const defaultData = { name: petDetails.name || "Unknown", breed: "Unknown", mode: "Scanning...", humanSafe: 'green', dogSafe: 'yellow', stats: [], squads: [] };
-  const finalPetData = aiResult ? { ...defaultData, ...aiResult } : defaultData;
+  const [resultStableId] = useState(() => Math.floor(Math.random() * 9000) + 1000);
+  const defaultData = { name: petDetails.name || "Unknown", breed: "Unknown", mode: "Scanning...", humanSafe: 'green', dogSafe: 'yellow', stats: [], squads: [], stableId: resultStableId };
+  const finalPetData = aiResult ? { ...defaultData, ...aiResult, stableId: resultStableId } : defaultData;
+
+  const handleCheckInComplete = () => {
+    setCheckedInToday(true);
+    setShowCheckIn(false);
+  };
 
   const handleMainScroll = (e) => { setIsScrolled(e.currentTarget.scrollTop > 50); };
 
@@ -1636,7 +2010,7 @@ export default function App() {
         {view === 'home' && (
           <div className="absolute top-0 left-0 right-0 z-40 pt-14 pb-3 px-6"
             style={{ background: 'rgba(253,246,236,0.88)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(237,227,216,0.6)' }}>
-            <Header mode={mode} onModeSwitch={(m) => { setMode(m); setView('home'); }} streak={streak} checkedInToday={checkedInToday} />
+            <Header mode={mode} onModeSwitch={(m) => { setMode(m); setView('home'); }} streak={streak} checkedInToday={checkedInToday} onStreakClick={() => !checkedInToday && setShowCheckIn(true)} />
           </div>
         )}
 
@@ -1781,7 +2155,7 @@ export default function App() {
                 style={{ color: view === 'journey' ? COLORS.terracotta : '#C4B8B0' }}>Journey</span>
             </motion.button>
 
-            <label className="relative -top-6 cursor-pointer">
+            <label className="relative -top-6 cursor-pointer flex flex-col items-center gap-0.5">
               <input type="file" accept="image/*" onChange={(e) => {
                 if (e.target.files[0]) { handleUpload(e.target.files[0]); e.target.value = ''; }
               }} className="hidden" />
@@ -1790,6 +2164,7 @@ export default function App() {
                 style={{ background: COLORS.terracotta, border: '3px solid #FDF6EC', boxShadow: '0 4px 20px -4px rgba(196,113,74,0.55)' }}>
                 <Scan weight="bold" className="w-5 h-5 text-white" />
               </motion.div>
+              <span className="text-[8px] font-bold" style={{ color: COLORS.terracotta }}>Scan</span>
             </label>
 
             <motion.button whileTap={tapAnimation} onClick={() => setView('profile')} className="flex flex-col items-center gap-0.5">
@@ -1800,6 +2175,17 @@ export default function App() {
             </motion.button>
           </div>
         </div>
+
+        <AnimatePresence>
+          {showCheckIn && (
+            <CheckInModal
+              streak={streak}
+              onClose={() => setShowCheckIn(false)}
+              onComplete={handleCheckInComplete}
+              todaysPet={savedPets[0]?.name || null}
+            />
+          )}
+        </AnimatePresence>
 
       </div>
     </div>
