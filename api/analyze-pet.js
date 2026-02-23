@@ -1,33 +1,39 @@
-// Vercel Serverless Function - 火山引擎豆包2.0版本
-// 使用原始fetch调用
+// Vercel Edge Function - 无10秒限制，API Key安全保护
 // 文件路径: api/analyze-pet.js
 
-export default async function handler(req, res) {
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    const { imageBase64, petType } = req.body;
+    const { imageBase64, petType } = await req.json();
 
     if (!imageBase64) {
-      return res.status(400).json({ error: 'Missing image data' });
+      return new Response(JSON.stringify({ error: 'Missing image data' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // 防止缓存：每次请求都加上唯一ID和时间戳
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const petTypeHint = petType === 'dog' ? 'dog' : 'cat';
-    
-    const prompt = `[Request ID: ${requestId}] [Timestamp: ${new Date().toISOString()}]
+    const imageUrl = imageBase64.startsWith('data:')
+      ? imageBase64
+      : `data:image/jpeg;base64,${imageBase64}`;
 
-You are analyzing a photo of a ${petTypeHint}. Look carefully at the SPECIFIC details in THIS exact image.
-
-Analyze this pet's current vibe based on their body language, expression, and what they're doing in the photo.
-
-Return ONLY a valid JSON object (no markdown, no code blocks, no extra text) in this EXACT format:
+    const prompt = `You are analyzing a photo of a ${petTypeHint}.
+Analyze this pet's current vibe based on their body language, expression, and what they're doing.
+Return ONLY a valid JSON object, no markdown, no extra text:
 {
-  "breed": "Specific breed name based on visual features in the photo",
-  "mode": "Current vibe in 2-3 words describing what you see (e.g. 'Zooming Around', 'Nap Time', 'Side-Eye Mode', 'Cuddle Mood')",
+  "breed": "specific breed name",
+  "mode": "current vibe in 2-3 words (e.g. 'Side-Eye Mode', 'Nap Time', 'Zoomies Mode')",
   "humanSafe": "green",
   "dogSafe": "green",
   "stats": [
@@ -35,148 +41,69 @@ Return ONLY a valid JSON object (no markdown, no code blocks, no extra text) in 
     {"label": "Sass", "value": 60},
     {"label": "Affection", "value": 90}
   ],
-  "diary": "One short, funny first-person sentence from this pet's perspective about what's happening in this specific photo"
+  "diary": "one short funny first-person sentence from this pet about what's happening"
 }
-
-CRITICAL RULES:
-- Analyze the ACTUAL image provided, not generic breed info
-- Each response must be unique to this specific photo
-- The "mode" should reflect what you actually see in the image
-- The "diary" should be about what's happening in THIS photo
-- Return ONLY the JSON object, absolutely no markdown formatting
-- All text must be in English
-- Values for humanSafe and dogSafe should be "green", "yellow", or "red"
-- Stats values should be numbers between 0-100`;
-
-    console.log(`[${requestId}] 开始豆包2.0分析 ${petType}...`);
-    console.log(`[${requestId}] API Key配置: ${process.env.VOLCENGINE_API_KEY ? '已配置' : '❌未配置'}`);
-
-    // 准备图片数据
-    const imageUrl = imageBase64.startsWith('data:') 
-      ? imageBase64 
-      : `data:image/jpeg;base64,${imageBase64}`;
-
-    // 设置8秒超时，在Vercel 10秒限制前主动中断，返回清晰错误而不是504
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+Rules: JSON only. English only. humanSafe/dogSafe must be green/yellow/red. Stats 0-100.`;
 
     const apiResponse = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
       method: 'POST',
-      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${process.env.VOLCENGINE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: "doubao-seed-2-0-lite-260215",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageUrl
-                }
-              },
-              {
-                type: "text",
-                text: prompt
-              }
-            ]
-          }
-        ],
-        temperature: 0.7,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: imageUrl } },
+            { type: "text", text: prompt }
+          ]
+        }],
+        temperature: 0.8,
         max_tokens: 400
       })
     });
 
-    clearTimeout(timeoutId);
-
-    console.log(`[${requestId}] API响应状态: ${apiResponse.status}`);
-
     if (!apiResponse.ok) {
-      const errorText = await apiResponse.text();
-      console.error(`[${requestId}] API错误响应:`, errorText);
-      
-      return res.status(500).json({
+      const errText = await apiResponse.text();
+      return new Response(JSON.stringify({
         success: false,
-        error: 'API调用失败',
-        status: apiResponse.status,
-        details: errorText,
-        hint: '请检查：1) API Key是否正确 2) 模型是否已开通 3) 是否有余额'
-      });
+        error: `豆包API错误 ${apiResponse.status}`,
+        details: errText.slice(0, 200)
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const result = await apiResponse.json();
-    console.log(`[${requestId}] API响应结构:`, Object.keys(result));
-
-    // chat/completions返回格式：{ choices: [{ message: { content: "..." } }] }
     const responseText = result.choices?.[0]?.message?.content;
-    
-    console.log(`[${requestId}] 原始响应:`, responseText);
 
     if (!responseText) {
-      console.error(`[${requestId}] 响应内容为空`);
-      throw new Error('AI返回了空响应');
+      return new Response(JSON.stringify({ success: false, error: 'AI返回空响应' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // 清理响应（去掉可能的markdown格式）
-    let cleanText = responseText
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-    
-    // 如果响应以```开头但没有json标记，也去掉
-    if (cleanText.startsWith('```')) {
-      cleanText = cleanText.replace(/^```\n?/, '').replace(/\n?```$/, '');
-    }
-
-    console.log(`[${requestId}] 清理后的响应:`, cleanText);
-
-    // 解析JSON
+    let cleanText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     let data;
     try {
       data = JSON.parse(cleanText);
-    } catch (parseError) {
-      console.error(`[${requestId}] JSON解析失败:`, cleanText);
-      throw new Error('无法解析AI响应为JSON');
+    } catch {
+      const match = cleanText.match(/\{[\s\S]*\}/);
+      if (match) data = JSON.parse(match[0]);
+      else throw new Error('无法解析AI响应');
     }
 
-    // 验证必需字段
-    if (!data.breed || !data.mode || !data.stats || !data.diary) {
-      console.error(`[${requestId}] 缺少必需字段:`, data);
-      throw new Error('AI响应缺少必需字段');
-    }
+    if (!data.breed || !data.mode) throw new Error('AI响应缺少必需字段');
 
-    console.log(`[${requestId}] 成功！品种: ${data.breed}, 模式: ${data.mode}`);
-
-    return res.status(200).json({
-      success: true,
-      data,
-      requestId,
-      timestamp: new Date().toISOString(),
-      model: 'doubao-seed-2.0-lite'
+    return new Response(JSON.stringify({ success: true, data }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('分析错误:', error.name, error.message);
-    
-    if (error.name === 'AbortError') {
-      return res.status(504).json({
-        success: false,
-        error: '豆包API响应超时，请重试'
-      });
-    }
-    
-    return res.status(500).json({
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message || '分析失败',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+      error: error.message || '分析失败'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
-
-export const config = {
-  maxDuration: 30,
-};
