@@ -1,8 +1,8 @@
-// Vercel Serverless Function - OpenAI Version
-// 文件路径: api/analyze-pet.js
+// Vercel Serverless Function - Claude Version
+// 文件路径: api/analyze-pet-claude.js
+// 等Anthropic API批准后使用这个版本
 
 export default async function handler(req, res) {
-  // 只允许POST请求
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -10,26 +10,23 @@ export default async function handler(req, res) {
   try {
     const { imageBase64, petType } = req.body;
 
-    // 验证输入
     if (!imageBase64) {
       return res.status(400).json({ error: 'Missing image data' });
     }
 
-    // 🔥 防止缓存：每次请求都加上唯一ID和时间戳
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
     const petTypeHint = petType === 'dog' ? 'dog' : 'cat';
     
     const prompt = `[Request ID: ${requestId}] [Timestamp: ${new Date().toISOString()}]
 
 You are analyzing a ${petTypeHint} photo. Look carefully at the SPECIFIC details in THIS exact image.
 
-Analyze this pet's current vibe based on their body language, expression, and surroundings in this photo.
+Analyze this pet's current vibe based on their body language, expression, and what they're doing in the photo.
 
 Return ONLY valid JSON (no markdown, no extra text) in this exact format:
 {
-  "breed": "Specific breed name based on visual features in the photo",
-  "mode": "Current vibe in 2-3 words describing what you see (e.g. 'Zooming Around', 'Nap Time', 'Side-Eye Mode', 'Cuddle Mood')",
+  "breed": "Specific breed name based on visual features",
+  "mode": "Current vibe in 2-3 words (e.g. 'Zooming Around', 'Nap Time', 'Side-Eye Mode')",
   "humanSafe": "green or yellow or red",
   "dogSafe": "green or yellow or red", 
   "stats": [
@@ -37,57 +34,64 @@ Return ONLY valid JSON (no markdown, no extra text) in this exact format:
     {"label": "Sass", "value": 60},
     {"label": "Affection", "value": 90}
   ],
-  "diary": "One short, funny first-person sentence from this pet's perspective about what's happening in this specific photo"
+  "diary": "One short, funny first-person sentence from this pet's perspective about what's happening in this photo"
 }
 
-CRITICAL: 
-- Analyze the ACTUAL image provided, not generic breed info
-- Each response must be unique to this specific photo
-- The "mode" should reflect what you actually see in the image
-- The "diary" should be about what's happening in THIS photo`;
+CRITICAL: Analyze the ACTUAL image. Each response must be unique to this specific photo.`;
 
-    console.log(`[${requestId}] Starting OpenAI analysis for ${petType}...`);
+    console.log(`[${requestId}] Starting Claude analysis for ${petType}...`);
 
-    // 调用OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // 准备图片数据（Claude需要base64格式，不带data:前缀）
+    const base64Data = imageBase64.includes('base64,') 
+      ? imageBase64.split('base64,')[1] 
+      : imageBase64;
+
+    // 调用Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // 便宜版本，够用
+        model: "claude-3-5-sonnet-20241022", // 最新的Claude模型
+        max_tokens: 1024,
         messages: [
           {
             role: "user",
             content: [
-              { type: "text", text: prompt },
-              { 
-                type: "image_url", 
-                image_url: { 
-                  url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
-                } 
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: "image/jpeg",
+                  data: base64Data,
+                }
+              },
+              {
+                type: "text",
+                text: prompt
               }
             ]
           }
         ],
-        max_tokens: 500,
-        temperature: 0.9, // 增加随机性，防止重复
+        temperature: 0.9,
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error(`[${requestId}] OpenAI API error:`, errorData);
-      throw new Error(errorData.error?.message || 'OpenAI API request failed');
+      console.error(`[${requestId}] Claude API error:`, errorData);
+      throw new Error(errorData.error?.message || 'Claude API request failed');
     }
 
     const result = await response.json();
-    const responseText = result.choices[0].message.content;
+    const responseText = result.content[0].text;
     
     console.log(`[${requestId}] Raw response:`, responseText);
 
-    // 清理响应（去掉markdown格式）
+    // 清理响应
     const cleanText = responseText
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
@@ -110,13 +114,12 @@ CRITICAL:
 
     console.log(`[${requestId}] Success! Breed: ${data.breed}, Mode: ${data.mode}`);
 
-    // 返回结果
     return res.status(200).json({
       success: true,
       data,
       requestId,
       timestamp: new Date().toISOString(),
-      model: 'gpt-4o-mini'
+      model: 'claude-3-5-sonnet'
     });
 
   } catch (error) {
