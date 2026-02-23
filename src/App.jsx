@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   House, User, Scan, ShareNetwork, Heart, Gear, SquaresFour, 
@@ -353,6 +354,27 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
   reader.onload = () => resolve(reader.result);
   reader.onerror = (error) => reject(error);
+});
+
+// 压缩图片到800px以内再传给API，防止504超时
+const fileToCompressedBase64 = (file) => new Promise((resolve, reject) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const MAX = 800;
+    let w = img.width, h = img.height;
+    if (w > MAX || h > MAX) {
+      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+      else { w = Math.round(w * MAX / h); h = MAX; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    resolve(canvas.toDataURL('image/jpeg', 0.8));
+  };
+  img.onerror = reject;
+  img.src = url;
 });
 
 // --- DATA ---
@@ -857,9 +879,7 @@ const CheckInModal = ({ onClose, streak, onComplete, todaysPet }) => {
   );
 };
 
-// ==========================================
-// FIX ADDED HERE: JourneyEmptyState component definition
-// ==========================================
+// Empty state for Journey
 const JourneyEmptyState = ({ onAdd }) => (
   <div className="flex flex-col items-center justify-center py-16 px-6">
     <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -1111,7 +1131,7 @@ const JournalCard = ({ pet }) => {
 };
 
 const PetNameCard = ({ image, petData, details, onSave, readonly = false, initialState = 'none' }) => {
-  const [activeState, initialStateValue = initialState] = useState(initialState);
+  const [activeState, setActiveState] = useState(initialState);
   const [showToast, setShowToast] = useState(false);
   const vibeTheme = getVibeTheme(petData.mode);
 
@@ -1123,7 +1143,7 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
     setTimeout(() => setShowToast(false), 2200);
   };
   const toggle = (target) => {
-    initialStateValue(prev => prev === target ? 'none' : target);
+    setActiveState(prev => prev === target ? 'none' : target);
   };
 
   return (
@@ -1464,6 +1484,11 @@ const PetDetailsForm = ({ image, onSubmit, mode, savedPets }) => {
     onSubmit(details);
   };
 
+  const handleNewSubmit = () => {
+    if (!name) return;
+    onSubmit({ name, age, gender });
+  };
+
   return (
     <div className="animate-in fade-in h-full flex flex-col relative z-20">
       <h2 className="font-display text-3xl font-black mb-5 pt-2" style={{ color: '#3D3530' }}>
@@ -1513,7 +1538,7 @@ const PetDetailsForm = ({ image, onSubmit, mode, savedPets }) => {
           </div>
           <div className="flex flex-col gap-3 mt-4">
             <motion.button whileTap={tapAnimation}
-              onClick={() => onSubmit({ name, age, gender })} disabled={!name}
+              onClick={handleNewSubmit} disabled={!name}
               className="w-full text-white text-base font-bold py-4 rounded-full shadow-md disabled:opacity-40"
               style={{ background: COLORS.terracotta, boxShadow: '0 4px 20px -6px rgba(196,113,74,0.5)' }}>
               Analyze Vibe
@@ -1807,25 +1832,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const lastVisit = localStorage.getItem('last_visit_date');
+    localStorage.removeItem('last_visit_date'); // 清除旧版本key
+    const lastCheckin = localStorage.getItem('last_checkin_date');
     const today = new Date().toDateString();
-    let currentStreak = parseInt(localStorage.getItem('vibe_streak') || "0");
+    const currentStreak = parseInt(localStorage.getItem('vibe_streak') || "0");
 
-    if (lastVisit === today) {
+    if (lastCheckin === today) {
       setCheckedInToday(true);
     } else {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (lastVisit === yesterday.toDateString()) {
-        currentStreak += 1;
-      } else if (!lastVisit) {
-        currentStreak = 1;
-      } else {
-        currentStreak = 1;
-      }
-      localStorage.setItem('vibe_streak', currentStreak);
-      localStorage.setItem('last_visit_date', today);
-      setCheckedInToday(true);
+      setCheckedInToday(false);
     }
     setStreak(currentStreak);
   }, []);
@@ -1849,28 +1864,35 @@ export default function App() {
 
   const [petImage, setPetImage] = useState(null);
   const [rawFile, setRawFile] = useState(null);
+  const rawFileRef = useRef(null);
+  const petImageRef = useRef(null);
   const [petDetails, setPetDetails] = useState({});
   const [aiResult, setAiResult] = useState(null);
   const [scanError, setScanError] = useState(false);
   const scanTimeoutRef = useRef(null);
 
   const handleUpload = async (file, base64) => {
+    const imageUrl = base64 || URL.createObjectURL(file);
     setRawFile(file);
-    setPetImage(base64 || URL.createObjectURL(file));
+    rawFileRef.current = file;
+    setPetImage(imageUrl);
+    petImageRef.current = imageUrl;
     setView('form');
   };
 
   const handleTrendClick = (trend) => { setSelectedTrend(trend); setView('trend-feed'); };
 
   const handleFormSubmit = async (details) => {
-    setPetDetails(details);
-    setScanError(false);
-    setView('scanning');
+    // flushSync强制React立刻同步渲染scanning页面，form彻底消失后才继续
+    flushSync(() => {
+      setPetDetails(details);
+      setScanError(false);
+      setView('scanning');
+    });
 
-    scanTimeoutRef.current = setTimeout(() => {
-      // 超时后回到表单页面，让用户重试
-      setView('form');
-    }, 20000);
+    // ref 保证拿到最新值，避免 async closure stale state 问题
+    const currentFile = rawFileRef.current;
+    const currentImage = petImageRef.current;
 
     const catFallback = {
       breed: "British Longhair",
@@ -1902,9 +1924,23 @@ export default function App() {
 
     const selectedFallback = mode === 'dog' ? dogFallback : catFallback;
 
+    let cancelled = false;
+
+    scanTimeoutRef.current = setTimeout(() => {
+      if (cancelled) return;
+      // 超时后直接用fallback数据跳到结果页，不打断用户流程
+      const fallback = mode === 'dog' ? dogFallback : catFallback;
+      fallback.squads = [
+        { id: 'dynamic-timeout', title: `${fallback.breed} Club`, members: "New", color: "bg-amber-400", image: currentImage || "https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400&q=80" },
+        ...TRENDS_DATA.filter(t => t.type === mode).slice(0, 2)
+      ];
+      setAiResult(fallback);
+      setView('result');
+    }, 20000);
+
     try {
       let data;
-      if (rawFile) {
+      if (currentFile) {
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         
         if (isDevelopment) {
@@ -1912,7 +1948,7 @@ export default function App() {
           await new Promise(res => setTimeout(res, 2000));
           data = selectedFallback;
         } else {
-          const imageBase64 = await fileToBase64(rawFile);
+          const imageBase64 = await fileToCompressedBase64(currentFile);
           
           console.log(`[Frontend] Calling API for ${mode} analysis...`);
           
@@ -1928,8 +1964,10 @@ export default function App() {
           });
 
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'API request failed');
+            const errorText = await response.text();
+            let errorMsg = `API error ${response.status}`;
+            try { errorMsg = JSON.parse(errorText).error || errorMsg; } catch {}
+            throw new Error(errorMsg);
           }
 
           const result = await response.json();
@@ -1946,16 +1984,19 @@ export default function App() {
         data = selectedFallback;
       }
 
+      // 用扫描的宠物照片作为第一个squad的图片
       data.squads = [
-        { id: 'dynamic-' + Date.now(), title: `${data.breed || 'Pet'} Club`, members: "New", color: "bg-amber-400", image: "https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400&q=80" },
+        { id: 'dynamic-' + Date.now(), title: `${data.breed || 'Pet'} Club`, members: "New", color: "bg-amber-400", image: currentImage || "https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=400&q=80" },
         ...TRENDS_DATA.filter(t => t.type === mode).slice(0, 2)
       ];
 
+      cancelled = true;
       clearTimeout(scanTimeoutRef.current);
       setAiResult(data);
       setView('result');
     } catch (error) {
       console.error('[Frontend] Analysis error:', error);
+      cancelled = true;
       clearTimeout(scanTimeoutRef.current);
       // 发生错误时使用fallback数据，不显示错误提示
       setAiResult(selectedFallback);
@@ -1987,6 +2028,23 @@ export default function App() {
   const finalPetData = aiResult ? { ...defaultData, ...aiResult, stableId: resultStableId } : defaultData;
 
   const handleCheckInComplete = () => {
+    const today = new Date().toDateString();
+    const lastCheckin = localStorage.getItem('last_checkin_date');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let newStreak;
+    if (lastCheckin === yesterday.toDateString()) {
+      newStreak = streak + 1; // 连续打卡
+    } else if (lastCheckin === today) {
+      newStreak = streak; // 今天已打，不变
+    } else {
+      newStreak = 1; // 断签，重置
+    }
+
+    localStorage.setItem('vibe_streak', newStreak);
+    localStorage.setItem('last_checkin_date', today);
+    setStreak(newStreak);
     setCheckedInToday(true);
     setShowCheckIn(false);
   };
@@ -2144,40 +2202,42 @@ export default function App() {
         </div>
 
         <div className="absolute bottom-6 left-6 right-6 flex justify-between items-center z-50">
-          <div className="w-full rounded-full px-7 py-2 h-16 flex justify-between items-center relative"
+          <div className="w-full rounded-full px-4 py-2 h-16 flex justify-between items-center relative"
             style={{ background: COLORS.cardBg, boxShadow: '0 8px 32px -8px rgba(100,60,20,0.22)', border: '1.5px solid #EDE3D8' }}>
-            <motion.button whileTap={tapAnimation} onClick={() => setView('home')} className="flex flex-col items-center gap-0.5">
+
+            <motion.button whileTap={tapAnimation} onClick={() => setView('home')} className="flex flex-col items-center gap-0.5 flex-1">
               <House weight={view === 'home' ? "fill" : "regular"} className="w-6 h-6 transition-colors"
                 style={{ color: view === 'home' ? COLORS.terracotta : '#C4B8B0' }} />
               <span className="text-[8px] font-bold transition-colors"
                 style={{ color: view === 'home' ? COLORS.terracotta : '#C4B8B0' }}>Home</span>
             </motion.button>
 
-            <motion.button whileTap={tapAnimation} onClick={() => setView('journey')} className="flex flex-col items-center gap-0.5">
+            <motion.button whileTap={tapAnimation} onClick={() => setView('journey')} className="flex flex-col items-center gap-0.5 flex-1">
               <Path weight={view === 'journey' ? "fill" : "regular"} className="w-6 h-6 transition-colors"
                 style={{ color: view === 'journey' ? COLORS.terracotta : '#C4B8B0' }} />
               <span className="text-[8px] font-bold transition-colors"
                 style={{ color: view === 'journey' ? COLORS.terracotta : '#C4B8B0' }}>Journey</span>
             </motion.button>
 
-            <label className="relative -top-6 cursor-pointer flex flex-col items-center gap-0.5">
+            <label className="flex flex-col items-center gap-0.5 flex-1 cursor-pointer">
               <input type="file" accept="image/*" onChange={(e) => {
                 if (e.target.files[0]) { handleUpload(e.target.files[0]); e.target.value = ''; }
               }} className="hidden" />
-              <motion.div whileTap={tapAnimation}
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ background: COLORS.terracotta, border: '3px solid #FDF6EC', boxShadow: '0 4px 20px -4px rgba(196,113,74,0.55)' }}>
-                <Scan weight="bold" className="w-5 h-5 text-white" />
-              </motion.div>
-              <span className="text-[8px] font-bold" style={{ color: COLORS.terracotta }}>Scan</span>
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Scan weight={['form','scanning','result'].includes(view) ? "fill" : "regular"} className="w-6 h-6 transition-colors"
+                  style={{ color: ['form','scanning','result'].includes(view) ? COLORS.terracotta : '#C4B8B0' }} />
+              </div>
+              <span className="text-[8px] font-bold transition-colors"
+                style={{ color: ['form','scanning','result'].includes(view) ? COLORS.terracotta : '#C4B8B0' }}>Scan</span>
             </label>
 
-            <motion.button whileTap={tapAnimation} onClick={() => setView('profile')} className="flex flex-col items-center gap-0.5">
+            <motion.button whileTap={tapAnimation} onClick={() => setView('profile')} className="flex flex-col items-center gap-0.5 flex-1">
               <User weight={view === 'profile' ? "fill" : "regular"} className="w-6 h-6 transition-colors"
                 style={{ color: view === 'profile' ? COLORS.terracotta : '#C4B8B0' }} />
               <span className="text-[8px] font-bold transition-colors"
                 style={{ color: view === 'profile' ? COLORS.terracotta : '#C4B8B0' }}>Profile</span>
             </motion.button>
+
           </div>
         </div>
 

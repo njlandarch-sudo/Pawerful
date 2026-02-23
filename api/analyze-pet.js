@@ -56,9 +56,13 @@ CRITICAL RULES:
       ? imageBase64 
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // 使用原始fetch调用 - chat/completions端点
+    // 设置8秒超时，在Vercel 10秒限制前主动中断，返回清晰错误而不是504
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     const apiResponse = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${process.env.VOLCENGINE_API_KEY}`,
         'Content-Type': 'application/json',
@@ -82,10 +86,12 @@ CRITICAL RULES:
             ]
           }
         ],
-        temperature: 0.9,
-        max_tokens: 1000
+        temperature: 0.7,
+        max_tokens: 400
       })
     });
+
+    clearTimeout(timeoutId);
 
     console.log(`[${requestId}] API响应状态: ${apiResponse.status}`);
 
@@ -154,7 +160,14 @@ CRITICAL RULES:
     });
 
   } catch (error) {
-    console.error('分析错误:', error);
+    console.error('分析错误:', error.name, error.message);
+    
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        success: false,
+        error: '豆包API响应超时，请重试'
+      });
+    }
     
     return res.status(500).json({
       success: false,

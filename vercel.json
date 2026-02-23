@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/analyze-pet.js": {
+      "maxDuration": 10
+    }
+  }
+}
