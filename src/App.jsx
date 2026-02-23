@@ -1495,7 +1495,7 @@ export default function App() {
     setView('scanning');
 
     scanTimeoutRef.current = setTimeout(() => {
-      setScanError(true);
+      // 超时后回到表单页面，让用户重试
       setView('form');
     }, 20000);
 
@@ -1584,8 +1584,7 @@ export default function App() {
     } catch (error) {
       console.error('[Frontend] Analysis error:', error);
       clearTimeout(scanTimeoutRef.current);
-      setScanError(true);
-      setTimeout(() => setScanError(false), 3000);
+      // 发生错误时使用fallback数据，不显示错误提示
       setAiResult(selectedFallback);
       setView('result');
     }
