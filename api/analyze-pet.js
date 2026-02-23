@@ -1,8 +1,6 @@
 // Vercel Serverless Function - 火山引擎豆包2.0版本
-// 使用OpenAI SDK兼容方式调用
+// 使用原始fetch调用
 // 文件路径: api/analyze-pet.js
-
-import { OpenAI } from 'openai';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -48,44 +46,64 @@ export default async function handler(req, res) {
 - 只返回JSON对象，不要有markdown格式`;
 
     console.log(`[${requestId}] 开始豆包2.0分析 ${petType}...`);
+    console.log(`[${requestId}] API Key配置: ${process.env.VOLCENGINE_API_KEY ? '已配置' : '❌未配置'}`);
 
-    // 准备图片数据 - 火山引擎需要完整的URL格式
+    // 准备图片数据
     const imageUrl = imageBase64.startsWith('data:') 
       ? imageBase64 
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // 初始化OpenAI客户端（兼容火山引擎）
-    const client = new OpenAI({
-      baseURL: "https://ark.cn-beijing.volces.com/api/v3",
-      apiKey: process.env.VOLCENGINE_API_KEY,
-    });
-
-    // 调用火山引擎API - 使用responses.create方法
-    const response = await client.responses.create({
-      model: "doubao-seed-2-0-lite-260215",
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_image",
-              image_url: imageUrl
-            },
-            {
-              type: "input_text",
-              text: prompt
-            }
-          ]
-        }
-      ],
-      parameters: {
+    // 使用原始fetch调用 - chat/completions端点
+    const apiResponse = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.VOLCENGINE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "doubao-seed-2-0-lite-260215",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUrl
+                }
+              },
+              {
+                type: "text",
+                text: prompt
+              }
+            ]
+          }
+        ],
         temperature: 0.9,
         max_tokens: 1000
-      }
+      })
     });
 
-    // 获取响应内容
-    const responseText = response.output;
+    console.log(`[${requestId}] API响应状态: ${apiResponse.status}`);
+
+    if (!apiResponse.ok) {
+      const errorText = await apiResponse.text();
+      console.error(`[${requestId}] API错误响应:`, errorText);
+      
+      return res.status(500).json({
+        success: false,
+        error: 'API调用失败',
+        status: apiResponse.status,
+        details: errorText,
+        hint: '请检查：1) API Key是否正确 2) 模型是否已开通 3) 是否有余额'
+      });
+    }
+
+    const result = await apiResponse.json();
+    console.log(`[${requestId}] API响应结构:`, Object.keys(result));
+
+    // chat/completions返回格式：{ choices: [{ message: { content: "..." } }] }
+    const responseText = result.choices?.[0]?.message?.content;
     
     console.log(`[${requestId}] 原始响应:`, responseText);
 
