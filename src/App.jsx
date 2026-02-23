@@ -856,6 +856,11 @@ const CheckInModal = ({ onClose, streak, onComplete, todaysPet }) => {
     </motion.div>
   );
 };
+
+// ==========================================
+// FIX ADDED HERE: JourneyEmptyState component definition
+// ==========================================
+const JourneyEmptyState = ({ onAdd }) => (
   <div className="flex flex-col items-center justify-center py-16 px-6">
     <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
       className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
@@ -1106,7 +1111,7 @@ const JournalCard = ({ pet }) => {
 };
 
 const PetNameCard = ({ image, petData, details, onSave, readonly = false, initialState = 'none' }) => {
-  const [activeState, setActiveState] = useState(initialState);
+  const [activeState, initialStateValue = initialState] = useState(initialState);
   const [showToast, setShowToast] = useState(false);
   const vibeTheme = getVibeTheme(petData.mode);
 
@@ -1118,7 +1123,7 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
     setTimeout(() => setShowToast(false), 2200);
   };
   const toggle = (target) => {
-    setActiveState(prev => prev === target ? 'none' : target);
+    initialStateValue(prev => prev === target ? 'none' : target);
   };
 
   return (
