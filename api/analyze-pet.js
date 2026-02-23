@@ -16,34 +16,37 @@ export default async function handler(req, res) {
 
     // 防止缓存：每次请求都加上唯一ID和时间戳
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const petTypeHint = petType === 'dog' ? '狗' : '猫';
-    
-    const prompt = `[请求ID: ${requestId}] [时间: ${new Date().toISOString()}]
+    const prompt = `[Request ID: ${requestId}] [Timestamp: ${new Date().toISOString()}]
 
-你正在分析一张${petTypeHint}的照片。请仔细观察这张具体照片中的细节。
+You are analyzing a photo of a ${petTypeHint}. Look carefully at the SPECIFIC details in THIS exact image.
 
-基于照片中宠物的肢体语言、表情和正在做的事情，分析它当前的状态。
+Analyze this pet's current vibe based on their body language, expression, and what they're doing in the photo.
 
-请以JSON格式返回结果（不要包含markdown代码块标记），格式如下：
+Return ONLY a valid JSON object (no markdown, no code blocks, no extra text) in this EXACT format:
 {
-  "breed": "根据照片中的视觉特征判断的具体品种名称",
-  "mode": "用2-3个字描述当前状态（例如：'疯跑中'、'午睡时间'、'侧眼模式'、'抱抱心情'）",
-  "humanSafe": "green 或 yellow 或 red",
-  "dogSafe": "green 或 yellow 或 red", 
+  "breed": "Specific breed name based on visual features in the photo",
+  "mode": "Current vibe in 2-3 words describing what you see (e.g. 'Zooming Around', 'Nap Time', 'Side-Eye Mode', 'Cuddle Mood')",
+  "humanSafe": "green",
+  "dogSafe": "green",
   "stats": [
-    {"label": "活力", "value": 75},
-    {"label": "傲娇", "value": 60},
-    {"label": "亲和", "value": 90}
+    {"label": "Energy", "value": 75},
+    {"label": "Sass", "value": 60},
+    {"label": "Affection", "value": 90}
   ],
-  "diary": "用第一人称写一句简短有趣的话，描述这张照片中正在发生的事"
+  "diary": "One short, funny first-person sentence from this pet's perspective about what's happening in this specific photo"
 }
 
-重要提示：
-- 分析这张实际提供的照片，而不是品种的一般信息
-- 每次回复都必须是这张具体照片的独特分析
-- "mode"应该反映你在图片中实际看到的内容
-- "diary"应该是关于这张照片中正在发生的事
-- 只返回JSON对象，不要有markdown格式`;
+CRITICAL RULES:
+- Analyze the ACTUAL image provided, not generic breed info
+- Each response must be unique to this specific photo
+- The "mode" should reflect what you actually see in the image
+- The "diary" should be about what's happening in THIS photo
+- Return ONLY the JSON object, absolutely no markdown formatting
+- All text must be in English
+- Values for humanSafe and dogSafe should be "green", "yellow", or "red"
+- Stats values should be numbers between 0-100`;
+
+    const petTypeHint = petType === 'dog' ? 'dog' : 'cat';
 
     console.log(`[${requestId}] 开始豆包2.0分析 ${petType}...`);
     console.log(`[${requestId}] API Key配置: ${process.env.VOLCENGINE_API_KEY ? '已配置' : '❌未配置'}`);
@@ -107,11 +110,23 @@ export default async function handler(req, res) {
     
     console.log(`[${requestId}] 原始响应:`, responseText);
 
+    if (!responseText) {
+      console.error(`[${requestId}] 响应内容为空`);
+      throw new Error('AI返回了空响应');
+    }
+
     // 清理响应（去掉可能的markdown格式）
-    const cleanText = responseText
+    let cleanText = responseText
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+    
+    // 如果响应以```开头但没有json标记，也去掉
+    if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    }
+
+    console.log(`[${requestId}] 清理后的响应:`, cleanText);
 
     // 解析JSON
     let data;
