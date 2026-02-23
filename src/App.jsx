@@ -9,7 +9,6 @@ import {
 } from '@phosphor-icons/react';
 
 // --- GLOBAL STYLES ---
-// FIX #10: Moved from dynamic injection to static string; inject once cleanly
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap');
   
@@ -56,7 +55,7 @@ const itemVariants = {
   show: { opacity: 1, y: 0, scale: 1, transition: smoothSpring } 
 };
 
-// --- COLOR PALETTE (CSS vars equivalent as constants) ---
+// --- COLOR PALETTE ---
 const COLORS = {
   cream: '#FDF6EC',
   warmBg: '#F5EDE0',
@@ -93,7 +92,6 @@ const getCroppedImg = async (imageSrc, zoom, offset) => {
   return canvas.toDataURL('image/jpeg', 0.9);
 };
 
-// FIX #4: Fixed the missing argument in drawRoundedRect (bottom-left corner was wrong)
 const drawRoundedRect = (ctx, x, y, w, h, r) => {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -102,7 +100,7 @@ const drawRoundedRect = (ctx, x, y, w, h, r) => {
   ctx.lineTo(x + w, y + h - r);
   ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
   ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x + r, y + h); // was: quadraticCurveTo(x, y, x + r, y) — bug fixed
+  ctx.quadraticCurveTo(x, y + h, x + r, y + h);
   ctx.closePath();
 };
 
@@ -168,6 +166,494 @@ const getVibeTheme = (modeString = "") => {
   if (mode.includes("love") || mode.includes("happy") || mode.includes("cuddle")) return { bg: "bg-gradient-to-br from-[#D47A8A] to-[#A8546A]", accent: "#D47A8A", line: "bg-pink-200", text: "text-white", desc: "Maximum serotonin.", fact: "Slow blinking is a cat's way of saying 'I trust you'.", Icon: Heart };
   if (mode.includes("side-eye") || mode.includes("sass") || mode.includes("judge")) return { bg: "bg-gradient-to-br from-[#C4914A] to-[#9A6830]", accent: "#C4914A", line: "bg-amber-200", text: "text-white", desc: "100% pure judgment.", fact: "Side-eye is actually a sign of high emotional intelligence.", Icon: Sparkle };
   return { bg: "bg-gradient-to-br from-[#6A9E7A] to-[#4A7A5A]", accent: "#6A9E7A", line: "bg-green-200", text: "text-white", desc: `A distinct ${modeString} energy.`, fact: "Pets communicate almost entirely through body language.", Icon: PawPrint };
+};
+
+// --- JOURNEY FEATURE ---
+const EVENT_TYPES = [
+  { id: 'milestone', label: 'Milestone', Icon: Trophy, color: '#C4914A', bg: '#FEF3E2', border: '#FDDFA0' },
+  { id: 'funny', label: 'Funny Moment', Icon: SmileyWink, color: '#D47A8A', bg: '#FEF0F3', border: '#F9C8D2' },
+  { id: 'health', label: 'Health', Icon: Syringe, color: '#5B8DB8', bg: '#EEF4FB', border: '#BDD4ED' },
+  { id: 'mood', label: 'Mood', Icon: Heartbeat, color: '#7BAE8A', bg: '#EEF7F1', border: '#B8DEC3' },
+];
+
+const getEventType = (id) => EVENT_TYPES.find(t => t.id === id) || EVENT_TYPES[0];
+
+// Add Journey entry form modal
+const AddJourneyModal = ({ savedPets, onClose, onSave }) => {
+  const [step, setStep] = useState(1);
+  const [selectedType, setSelectedType] = useState(null);
+  const [selectedPet, setSelectedPet] = useState(savedPets[0]?.name || '');
+  const [title, setTitle] = useState('');
+  const [story, setStory] = useState('');
+  const [isBig, setIsBig] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const uniquePetNames = [...new Set(savedPets.map(p => p.name).filter(Boolean))];
+
+  const handleSave = () => {
+    if (!title.trim()) return;
+    onSave({
+      id: Date.now(),
+      type: selectedType?.id || 'milestone',
+      petName: selectedPet,
+      title: title.trim(),
+      story: story.trim(),
+      isBig,
+      date,
+      timestamp: new Date().toISOString(),
+    });
+    onClose();
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="absolute inset-0 z-[70] flex items-end justify-center"
+      style={{ background: 'rgba(30,15,5,0.55)', backdropFilter: 'blur(10px)' }}
+      onClick={onClose}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={smoothSpring}
+        onClick={e => e.stopPropagation()}
+        className="w-full rounded-t-[36px] overflow-hidden"
+        style={{ background: COLORS.cream, maxHeight: '88%' }}>
+
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full opacity-25" style={{ background: COLORS.slate }}></div>
+        </div>
+
+        <div className="px-6 pb-10 overflow-y-auto scrollbar-hide" style={{ maxHeight: '80vh' }}>
+          <div className="flex justify-between items-center mb-6 pt-2">
+            <h2 className="font-display text-2xl font-black" style={{ color: COLORS.slate }}>
+              {step === 1 ? 'What happened?' : 'Tell the story'}
+            </h2>
+            <button onClick={onClose} className="p-2 rounded-full" style={{ background: '#EDE3D8' }}>
+              <X weight="bold" className="w-4 h-4" style={{ color: COLORS.slate }} />
+            </button>
+          </div>
+
+          {step === 1 && (
+            <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+              <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: COLORS.muted }}>Type of Moment</p>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {EVENT_TYPES.map(type => (
+                  <motion.button key={type.id} variants={itemVariants} whileTap={tapAnimation}
+                    onClick={() => setSelectedType(type)}
+                    className="p-4 rounded-[20px] flex flex-col items-start gap-2 transition-all"
+                    style={{
+                      background: selectedType?.id === type.id ? type.bg : COLORS.cardBg,
+                      border: `2px solid ${selectedType?.id === type.id ? type.border : '#EDE3D8'}`,
+                      boxShadow: selectedType?.id === type.id ? `0 4px 16px -4px ${type.color}40` : 'none'
+                    }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: type.bg, border: `1.5px solid ${type.border}` }}>
+                      <type.Icon weight="fill" className="w-5 h-5" style={{ color: type.color }} />
+                    </div>
+                    <span className="font-black text-sm" style={{ color: COLORS.slate }}>{type.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+
+              <div className="p-4 rounded-[20px] flex items-center justify-between"
+                style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
+                <div>
+                  <p className="font-black text-sm" style={{ color: COLORS.slate }}>Big Milestone?</p>
+                  <p className="text-[10px] font-semibold" style={{ color: COLORS.muted }}>Shows as a large feature card</p>
+                </div>
+                <button onClick={() => setIsBig(!isBig)}
+                  className="w-12 h-6 rounded-full transition-all relative"
+                  style={{ background: isBig ? COLORS.terracotta : '#EDE3D8' }}>
+                  <motion.div animate={{ x: isBig ? 24 : 2 }}
+                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
+                    style={{ left: 0 }} transition={smoothSpring} />
+                </button>
+              </div>
+
+              <motion.button whileTap={tapAnimation} onClick={() => selectedType && setStep(2)}
+                className="w-full font-bold py-4 rounded-full text-white mt-2"
+                style={{
+                  background: selectedType ? COLORS.terracotta : '#C4B8B0',
+                  boxShadow: selectedType ? '0 4px 20px -6px rgba(196,113,74,0.5)' : 'none',
+                  transition: 'all 0.3s'
+                }}>
+                Continue
+              </motion.button>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+              {uniquePetNames.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>For which pet?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {uniquePetNames.map(name => (
+                      <button key={name} onClick={() => setSelectedPet(name)}
+                        className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
+                        style={{
+                          background: selectedPet === name ? COLORS.terracotta : COLORS.cardBg,
+                          color: selectedPet === name ? 'white' : COLORS.muted,
+                          border: `1.5px solid ${selectedPet === name ? COLORS.terracotta : '#EDE3D8'}`
+                        }}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Date</p>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="w-full p-3.5 rounded-2xl font-bold text-sm"
+                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Title</p>
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+                  placeholder={selectedType?.id === 'milestone' ? 'e.g. First time at the beach!' :
+                               selectedType?.id === 'funny' ? 'e.g. Stole my sandwich again' :
+                               selectedType?.id === 'health' ? 'e.g. Annual vet checkup' : 'e.g. Super cuddly today'}
+                  className="w-full p-3.5 rounded-2xl font-bold text-sm"
+                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }}
+                  autoFocus />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Story (optional)</p>
+                <textarea value={story} onChange={e => setStory(e.target.value)}
+                  placeholder="What exactly happened? The more detail, the better the memory..."
+                  rows={4}
+                  className="w-full p-3.5 rounded-2xl font-semibold text-sm resize-none"
+                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }} />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setStep(1)}
+                  className="px-5 py-4 rounded-full font-bold text-sm"
+                  style={{ background: '#EDE3D8', color: COLORS.muted }}>
+                  Back
+                </button>
+                <motion.button whileTap={tapAnimation} onClick={handleSave}
+                  disabled={!title.trim()}
+                  className="flex-1 font-bold py-4 rounded-full text-white"
+                  style={{
+                    background: title.trim() ? COLORS.terracotta : '#C4B8B0',
+                    boxShadow: title.trim() ? '0 4px 20px -6px rgba(196,113,74,0.5)' : 'none'
+                  }}>
+                  Save Memory
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Big milestone card
+const MilestoneCard = ({ entry, onDelete }) => {
+  const eventType = getEventType(entry.type);
+  const formattedDate = new Date(entry.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const [showMenu, setShowMenu] = useState(false);
+
+  return (
+    <motion.div variants={itemVariants} className="relative mb-5 rounded-[28px] overflow-hidden pet-card-shadow"
+      style={{ background: eventType.bg, border: `2px solid ${eventType.border}` }}>
+      <div className="h-1.5 w-full" style={{ background: eventType.color, opacity: 0.7 }}></div>
+
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.7)', border: `1.5px solid ${eventType.border}` }}>
+              <eventType.Icon weight="fill" className="w-5 h-5" style={{ color: eventType.color }} />
+            </div>
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-widest block" style={{ color: eventType.color }}>
+                {eventType.label}
+              </span>
+              <span className="text-[10px] font-semibold" style={{ color: COLORS.muted }}>{entry.petName}</span>
+            </div>
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.6)' }}>
+              <DotsThree weight="bold" className="w-4 h-4" style={{ color: COLORS.muted }} />
+            </button>
+            <AnimatePresence>
+              {showMenu && (
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="absolute right-0 top-8 rounded-2xl overflow-hidden z-10 pet-card-shadow"
+                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', minWidth: 120 }}>
+                  <button onClick={() => { onDelete(entry.id); setShowMenu(false); }}
+                    className="w-full px-4 py-3 text-left text-xs font-bold flex items-center gap-2"
+                    style={{ color: '#C4514A' }}>
+                    <Trash weight="bold" className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <h3 className="font-display text-2xl font-black mb-2 leading-tight" style={{ color: COLORS.slate }}>
+          {entry.title}
+        </h3>
+        {entry.story && (
+          <p className="text-sm font-semibold leading-relaxed mb-3" style={{ color: '#6A5A50' }}>
+            {entry.story}
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 mt-3">
+          <CalendarBlank weight="fill" className="w-3 h-3" style={{ color: eventType.color }} />
+          <span className="text-[10px] font-bold" style={{ color: COLORS.muted }}>{formattedDate}</span>
+          <div className="ml-auto px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${eventType.border}` }}>
+            <span className="text-[9px] font-black uppercase tracking-wide" style={{ color: eventType.color }}>Big Moment</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Regular timeline entry
+const TimelineEntry = ({ entry, isLast, onDelete }) => {
+  const eventType = getEventType(entry.type);
+  const formattedDate = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const [showMenu, setShowMenu] = useState(false);
+
+  return (
+    <motion.div variants={itemVariants} className="flex gap-4 relative">
+      <div className="flex flex-col items-center" style={{ minWidth: 32 }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10"
+          style={{ background: eventType.bg, border: `2px solid ${eventType.border}` }}>
+          <eventType.Icon weight="fill" className="w-4 h-4" style={{ color: eventType.color }} />
+        </div>
+        {!isLast && (
+          <div className="w-0.5 flex-1 mt-1" style={{ background: '#EDE3D8', minHeight: 32 }}></div>
+        )}
+      </div>
+
+      <div className="flex-1 pb-6">
+        <div className="p-4 rounded-[20px] relative"
+          style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
+          <div className="flex justify-between items-start">
+            <div className="flex-1 pr-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: eventType.color }}>
+                  {eventType.label}
+                </span>
+                {entry.petName && (
+                  <span className="text-[9px] font-semibold" style={{ color: COLORS.muted }}>· {entry.petName}</span>
+                )}
+              </div>
+              <p className="font-black text-sm leading-snug" style={{ color: COLORS.slate }}>{entry.title}</p>
+              {entry.story && (
+                <p className="text-xs font-semibold mt-1.5 leading-relaxed" style={{ color: COLORS.muted }}>{entry.story}</p>
+              )}
+            </div>
+            <div className="relative flex-shrink-0">
+              <button onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-full"
+                style={{ background: '#F5EDE0' }}>
+                <DotsThree weight="bold" className="w-3.5 h-3.5" style={{ color: COLORS.muted }} />
+              </button>
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div initial={{ opacity: 0, scale: 0.9, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="absolute right-0 top-8 rounded-2xl overflow-hidden z-10 pet-card-shadow"
+                    style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', minWidth: 110 }}>
+                    <button onClick={() => { onDelete(entry.id); setShowMenu(false); }}
+                      className="w-full px-4 py-3 text-left text-xs font-bold flex items-center gap-2"
+                      style={{ color: '#C4514A' }}>
+                      <Trash weight="bold" className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-2">
+            <CalendarBlank weight="fill" className="w-3 h-3" style={{ color: '#C4B8B0' }} />
+            <span className="text-[10px] font-semibold" style={{ color: '#C4B8B0' }}>{formattedDate}</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Empty state for Journey
+const JourneyEmptyState = ({ onAdd }) => (
+  <div className="flex flex-col items-center justify-center py-16 px-6">
+    <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+      className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
+      style={{ background: 'linear-gradient(135deg, #FEF3E2, #FDDFA0)' }}>
+      <Path weight="fill" className="w-10 h-10" style={{ color: '#C4914A' }} />
+    </motion.div>
+    <h3 className="font-display text-2xl font-black mb-2 text-center" style={{ color: COLORS.slate }}>
+      Start the Journey
+    </h3>
+    <p className="text-sm font-semibold text-center mb-8 max-w-[240px] leading-relaxed" style={{ color: COLORS.muted }}>
+      Every milestone, funny moment, and health visit deserves to be remembered.
+    </p>
+    <motion.button whileTap={tapAnimation} onClick={onAdd}
+      className="px-7 py-4 rounded-full font-bold text-white flex items-center gap-2"
+      style={{ background: COLORS.terracotta, boxShadow: '0 4px 20px -6px rgba(196,113,74,0.5)' }}>
+      <Plus weight="bold" className="w-4 h-4" /> Add First Memory
+    </motion.button>
+  </div>
+);
+
+// Full Journey page
+const JourneyPage = ({ journeyEntries, savedPets, onAddEntry, onDeleteEntry }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [filterPet, setFilterPet] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+
+  const uniquePetNames = [...new Set(savedPets.map(p => p.name).filter(Boolean))];
+
+  const filtered = journeyEntries
+    .filter(e => filterPet === 'all' || e.petName === filterPet)
+    .filter(e => filterType === 'all' || e.type === filterType)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const grouped = filtered.reduce((acc, entry) => {
+    const d = new Date(entry.date);
+    const key = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <div className="pb-28">
+        <div className="pt-16 px-6 mb-5">
+          <div className="flex justify-between items-center mb-1">
+            <h1 className="font-display text-3xl font-black" style={{ color: COLORS.slate }}>Journey</h1>
+            <motion.button whileTap={tapAnimation} onClick={() => setShowAddModal(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white"
+              style={{ background: COLORS.terracotta, boxShadow: '0 4px 16px -4px rgba(196,113,74,0.5)' }}>
+              <Plus weight="bold" className="w-5 h-5" />
+            </motion.button>
+          </div>
+          <p className="text-sm font-semibold" style={{ color: COLORS.muted }}>
+            {journeyEntries.length} {journeyEntries.length === 1 ? 'memory' : 'memories'} collected
+          </p>
+        </div>
+
+        {journeyEntries.length > 0 && (
+          <div className="mx-6 mb-5 p-4 rounded-[24px] flex justify-between"
+            style={{ background: 'linear-gradient(135deg, #FEF3E2, #FDF6EC)', border: '1.5px solid #FDDFA0' }}>
+            {EVENT_TYPES.map(type => {
+              const count = journeyEntries.filter(e => e.type === type.id).length;
+              return (
+                <div key={type.id} className="flex flex-col items-center gap-1">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ background: type.bg, border: `1.5px solid ${type.border}` }}>
+                    <type.Icon weight="fill" className="w-4 h-4" style={{ color: type.color }} />
+                  </div>
+                  <span className="font-black text-sm" style={{ color: COLORS.slate }}>{count}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>
+                    {type.label.split(' ')[0]}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {journeyEntries.length > 0 && (
+          <div className="px-6 mb-5 space-y-2">
+            {uniquePetNames.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                <button onClick={() => setFilterPet('all')}
+                  className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
+                  style={{
+                    background: filterPet === 'all' ? COLORS.slate : COLORS.cardBg,
+                    color: filterPet === 'all' ? 'white' : COLORS.muted,
+                    border: '1.5px solid #EDE3D8'
+                  }}>All pets</button>
+                {uniquePetNames.map(name => (
+                  <button key={name} onClick={() => setFilterPet(name)}
+                    className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
+                    style={{
+                      background: filterPet === name ? COLORS.slate : COLORS.cardBg,
+                      color: filterPet === name ? 'white' : COLORS.muted,
+                      border: '1.5px solid #EDE3D8'
+                    }}>{name}</button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+              <button onClick={() => setFilterType('all')}
+                className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
+                style={{
+                  background: filterType === 'all' ? COLORS.terracotta : COLORS.cardBg,
+                  color: filterType === 'all' ? 'white' : COLORS.muted,
+                  border: '1.5px solid #EDE3D8'
+                }}>All types</button>
+              {EVENT_TYPES.map(type => (
+                <button key={type.id} onClick={() => setFilterType(type.id)}
+                  className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all flex items-center gap-1"
+                  style={{
+                    background: filterType === type.id ? type.color : COLORS.cardBg,
+                    color: filterType === type.id ? 'white' : COLORS.muted,
+                    border: `1.5px solid ${filterType === type.id ? type.color : '#EDE3D8'}`
+                  }}>
+                  <type.Icon weight="fill" className="w-3 h-3" />
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {journeyEntries.length === 0 ? (
+          <JourneyEmptyState onAdd={() => setShowAddModal(true)} />
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-12 opacity-60">
+            <p className="text-sm font-bold" style={{ color: COLORS.muted }}>No entries match this filter.</p>
+          </div>
+        ) : (
+          <motion.div variants={containerVariants} initial="hidden" animate="show" className="px-6">
+            {Object.entries(grouped).map(([monthYear, entries]) => (
+              <div key={monthYear} className="mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px flex-1" style={{ background: '#EDE3D8' }}></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full"
+                    style={{ background: '#EDE3D8', color: COLORS.muted }}>
+                    {monthYear}
+                  </span>
+                  <div className="h-px flex-1" style={{ background: '#EDE3D8' }}></div>
+                </div>
+
+                {entries.map((entry, i) =>
+                  entry.isBig
+                    ? <MilestoneCard key={entry.id} entry={entry} onDelete={onDeleteEntry} />
+                    : <TimelineEntry key={entry.id} entry={entry} isLast={i === entries.length - 1} onDelete={onDeleteEntry} />
+                )}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showAddModal && (
+          <AddJourneyModal
+            savedPets={savedPets}
+            onClose={() => setShowAddModal(false)}
+            onSave={onAddEntry}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 };
 
 // --- COMPONENTS ---
@@ -251,7 +737,6 @@ const JournalCard = ({ pet }) => {
   );
 };
 
-// FIX #3: Pet ID is now passed in as a prop (generated once at save time), not random on render
 const PetNameCard = ({ image, petData, details, onSave, readonly = false, initialState = 'none' }) => {
   const [activeState, setActiveState] = useState(initialState);
   const [showToast, setShowToast] = useState(false);
@@ -284,7 +769,6 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
         )}
       </AnimatePresence>
 
-      {/* Vibe panel */}
       <motion.div
         layout transition={smoothSpring}
         onClick={() => toggle('vibe')}
@@ -319,7 +803,6 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
         </AnimatePresence>
       </motion.div>
 
-      {/* Pet details panel */}
       <motion.div
         layout transition={smoothSpring}
         onClick={() => toggle('details')}
@@ -342,7 +825,6 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
             <div className="flex justify-between items-end mb-5">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
-                  {/* FIX #3: Use stable pet.id passed in, not Math.random() */}
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest"
                     style={{ background: '#EDE3D8', color: '#9B8E85' }}>
                     ID: {petData.stableId || '—'}
@@ -419,7 +901,6 @@ const PetNameCard = ({ image, petData, details, onSave, readonly = false, initia
 
 const ScanningScreen = ({ image, mode }) => {
   const [loadingText, setLoadingText] = useState("Initializing sensors...");
-  // FIX #8: Add a timeout so the app never gets stuck on scanning forever
   useEffect(() => {
     let index = 0;
     const steps = ["Calibrating sensors...", "Analyzing fuzziness...", "Detecting good vibes...", "Reading pet's mind...", "Writing diary entry..."];
@@ -510,7 +991,6 @@ const AvatarEditorModal = ({ image, onClose, onSave }) => {
   );
 };
 
-// FIX #2: Streak button now shows "Already checked in" feedback instead of blindly incrementing
 const Header = ({ mode, onModeSwitch, streak, checkedInToday }) => (
   <div className="flex justify-between items-center w-full">
     <div className="flex items-center gap-2.5">
@@ -521,7 +1001,6 @@ const Header = ({ mode, onModeSwitch, streak, checkedInToday }) => (
       <span className="font-black text-lg tracking-tight" style={{ color: '#3D3530', fontFamily: 'Fraunces, serif' }}>Pawerful</span>
     </div>
     <div className="flex items-center gap-2">
-      {/* FIX #2: Streak display only — no tap-to-increment. Streak is managed by app load. */}
       <div className="px-3 py-1.5 rounded-full flex items-center gap-1.5"
         style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid #EDE3D8' }}>
         <Fire weight="fill" className="w-3.5 h-3.5" style={{ color: streak > 0 ? '#E8703A' : '#C4B8B0' }} />
@@ -565,7 +1044,6 @@ const ShowroomHero = ({ onUpload, backgroundImage, onUpdateBackground, mode }) =
       <img src={backgroundImage} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
       <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(30,15,5,0.82) 0%, rgba(30,15,5,0.1) 50%, transparent 100%)' }}></div>
       
-      {/* Decorative paw prints */}
       <div className="absolute top-8 right-20 opacity-10">
         <PawPrint weight="fill" className="w-8 h-8 text-white" />
       </div>
@@ -681,7 +1159,6 @@ const PetDetailsForm = ({ image, onSubmit, mode, savedPets }) => {
   );
 };
 
-// FIX #6: Trending communities now shows proper filtered results for both modes
 const TrendingCommunities = ({ onTrendClick, mode }) => {
   const filteredTrends = TRENDS_DATA.filter(t => t.type === mode);
   return (
@@ -777,8 +1254,7 @@ const MyPage = ({ savedPets, userProfile, setUserProfile }) => {
   const filteredPets = activeTab === 'all' ? savedPets : collections[activeTab] || [];
   const petNames = Object.keys(collections);
 
-  // FIX #7: Days uses real savedPets streak context; Likes would be from real data
-  const totalLikes = savedPets.length * 47; // Illustrative — would come from a real backend
+  const totalLikes = savedPets.length * 47;
   const formattedLikes = totalLikes > 999 ? (totalLikes / 1000).toFixed(1) + 'k' : totalLikes;
 
   const handleSaveProfile = () => { setUserProfile({ ...userProfile, name: tempName, bio: tempBio }); setIsEditing(false); };
@@ -793,7 +1269,6 @@ const MyPage = ({ savedPets, userProfile, setUserProfile }) => {
   return (
     <>
       <div className="pb-24">
-        {/* Profile header */}
         <div className="pt-24 px-6 mb-7">
           <div className="flex justify-between items-start mb-6">
             <div className="relative">
@@ -843,7 +1318,6 @@ const MyPage = ({ savedPets, userProfile, setUserProfile }) => {
             </div>
           )}
 
-          {/* FIX #7: Stats now use real data where possible */}
           <div className="flex gap-7 mt-5">
             <div className="flex flex-col">
               <span className="font-black text-lg" style={{ color: '#3D3530' }}>{savedPets.length}</span>
@@ -934,515 +1408,6 @@ const MyPage = ({ savedPets, userProfile, setUserProfile }) => {
   );
 };
 
-// --- JOURNEY FEATURE ---
-
-const EVENT_TYPES = [
-  { id: 'milestone', label: 'Milestone', Icon: Trophy, color: '#C4914A', bg: '#FEF3E2', border: '#FDDFA0' },
-  { id: 'funny',     label: 'Funny Moment', Icon: SmileyWink, color: '#D47A8A', bg: '#FEF0F3', border: '#F9C8D2' },
-  { id: 'health',    label: 'Health',    Icon: Syringe,  color: '#5B8DB8', bg: '#EEF4FB', border: '#BDD4ED' },
-  { id: 'mood',      label: 'Mood',      Icon: Heartbeat,color: '#7BAE8A', bg: '#EEF7F1', border: '#B8DEC3' },
-];
-
-const getEventType = (id) => EVENT_TYPES.find(t => t.id === id) || EVENT_TYPES[0];
-
-// Add Journey entry form modal
-const AddJourneyModal = ({ savedPets, onClose, onSave }) => {
-  const [step, setStep] = useState(1); // 1 = type, 2 = details
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedPet, setSelectedPet] = useState(savedPets[0]?.name || '');
-  const [title, setTitle] = useState('');
-  const [story, setStory] = useState('');
-  const [isBig, setIsBig] = useState(false); // big = milestone card, small = regular entry
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-
-  const uniquePetNames = [...new Set(savedPets.map(p => p.name).filter(Boolean))];
-
-  const handleSave = () => {
-    if (!title.trim()) return;
-    onSave({
-      id: Date.now(),
-      type: selectedType?.id || 'milestone',
-      petName: selectedPet,
-      title: title.trim(),
-      story: story.trim(),
-      isBig,
-      date,
-      timestamp: new Date().toISOString(),
-    });
-    onClose();
-  };
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="absolute inset-0 z-[70] flex items-end justify-center"
-      style={{ background: 'rgba(30,15,5,0.55)', backdropFilter: 'blur(10px)' }}
-      onClick={onClose}>
-      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={smoothSpring}
-        onClick={e => e.stopPropagation()}
-        className="w-full rounded-t-[36px] overflow-hidden"
-        style={{ background: COLORS.cream, maxHeight: '88%' }}>
-
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full opacity-25" style={{ background: COLORS.slate }}></div>
-        </div>
-
-        <div className="px-6 pb-10 overflow-y-auto scrollbar-hide" style={{ maxHeight: '80vh' }}>
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6 pt-2">
-            <h2 className="font-display text-2xl font-black" style={{ color: COLORS.slate }}>
-              {step === 1 ? 'What happened?' : 'Tell the story'}
-            </h2>
-            <button onClick={onClose} className="p-2 rounded-full" style={{ background: '#EDE3D8' }}>
-              <X weight="bold" className="w-4 h-4" style={{ color: COLORS.slate }} />
-            </button>
-          </div>
-
-          {step === 1 && (
-            <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
-              {/* Event type grid */}
-              <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: COLORS.muted }}>Type of Moment</p>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {EVENT_TYPES.map(type => (
-                  <motion.button key={type.id} variants={itemVariants} whileTap={tapAnimation}
-                    onClick={() => setSelectedType(type)}
-                    className="p-4 rounded-[20px] flex flex-col items-start gap-2 transition-all"
-                    style={{
-                      background: selectedType?.id === type.id ? type.bg : COLORS.cardBg,
-                      border: `2px solid ${selectedType?.id === type.id ? type.border : '#EDE3D8'}`,
-                      boxShadow: selectedType?.id === type.id ? `0 4px 16px -4px ${type.color}40` : 'none'
-                    }}>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                      style={{ background: type.bg, border: `1.5px solid ${type.border}` }}>
-                      <type.Icon weight="fill" className="w-5 h-5" style={{ color: type.color }} />
-                    </div>
-                    <span className="font-black text-sm" style={{ color: COLORS.slate }}>{type.label}</span>
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* Is it a BIG moment? */}
-              <div className="p-4 rounded-[20px] flex items-center justify-between"
-                style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
-                <div>
-                  <p className="font-black text-sm" style={{ color: COLORS.slate }}>Big Milestone?</p>
-                  <p className="text-[10px] font-semibold" style={{ color: COLORS.muted }}>Shows as a large feature card</p>
-                </div>
-                <button onClick={() => setIsBig(!isBig)}
-                  className="w-12 h-6 rounded-full transition-all relative"
-                  style={{ background: isBig ? COLORS.terracotta : '#EDE3D8' }}>
-                  <motion.div animate={{ x: isBig ? 24 : 2 }}
-                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
-                    style={{ left: 0 }} transition={smoothSpring} />
-                </button>
-              </div>
-
-              <motion.button whileTap={tapAnimation} onClick={() => selectedType && setStep(2)}
-                className="w-full font-bold py-4 rounded-full text-white mt-2"
-                style={{
-                  background: selectedType ? COLORS.terracotta : '#C4B8B0',
-                  boxShadow: selectedType ? '0 4px 20px -6px rgba(196,113,74,0.5)' : 'none',
-                  transition: 'all 0.3s'
-                }}>
-                Continue
-              </motion.button>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
-              {/* Pet selector */}
-              {uniquePetNames.length > 1 && (
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>For which pet?</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {uniquePetNames.map(name => (
-                      <button key={name} onClick={() => setSelectedPet(name)}
-                        className="px-3 py-1.5 rounded-full text-xs font-bold transition-all"
-                        style={{
-                          background: selectedPet === name ? COLORS.terracotta : COLORS.cardBg,
-                          color: selectedPet === name ? 'white' : COLORS.muted,
-                          border: `1.5px solid ${selectedPet === name ? COLORS.terracotta : '#EDE3D8'}`
-                        }}>
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Date */}
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Date</p>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="w-full p-3.5 rounded-2xl font-bold text-sm"
-                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }} />
-              </div>
-
-              {/* Title */}
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Title</p>
-                <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-                  placeholder={selectedType?.id === 'milestone' ? 'e.g. First time at the beach!' :
-                               selectedType?.id === 'funny' ? 'e.g. Stole my sandwich again' :
-                               selectedType?.id === 'health' ? 'e.g. Annual vet checkup' : 'e.g. Super cuddly today'}
-                  className="w-full p-3.5 rounded-2xl font-bold text-sm"
-                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }}
-                  autoFocus />
-              </div>
-
-              {/* Story */}
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: COLORS.muted }}>Story (optional)</p>
-                <textarea value={story} onChange={e => setStory(e.target.value)}
-                  placeholder="What exactly happened? The more detail, the better the memory..."
-                  rows={4}
-                  className="w-full p-3.5 rounded-2xl font-semibold text-sm resize-none"
-                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: COLORS.slate }} />
-              </div>
-
-              <div className="flex gap-3 pt-1">
-                <button onClick={() => setStep(1)}
-                  className="px-5 py-4 rounded-full font-bold text-sm"
-                  style={{ background: '#EDE3D8', color: COLORS.muted }}>
-                  Back
-                </button>
-                <motion.button whileTap={tapAnimation} onClick={handleSave}
-                  disabled={!title.trim()}
-                  className="flex-1 font-bold py-4 rounded-full text-white"
-                  style={{
-                    background: title.trim() ? COLORS.terracotta : '#C4B8B0',
-                    boxShadow: title.trim() ? '0 4px 20px -6px rgba(196,113,74,0.5)' : 'none'
-                  }}>
-                  Save Memory
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// Big milestone card (feature-sized)
-const MilestoneCard = ({ entry, onDelete }) => {
-  const eventType = getEventType(entry.type);
-  const formattedDate = new Date(entry.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const [showMenu, setShowMenu] = useState(false);
-
-  return (
-    <motion.div variants={itemVariants} className="relative mb-5 rounded-[28px] overflow-hidden pet-card-shadow"
-      style={{ background: eventType.bg, border: `2px solid ${eventType.border}` }}>
-      {/* Decorative top strip */}
-      <div className="h-1.5 w-full" style={{ background: eventType.color, opacity: 0.7 }}></div>
-
-      <div className="p-5">
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.7)', border: `1.5px solid ${eventType.border}` }}>
-              <eventType.Icon weight="fill" className="w-5 h-5" style={{ color: eventType.color }} />
-            </div>
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-widest block" style={{ color: eventType.color }}>
-                {eventType.label}
-              </span>
-              <span className="text-[10px] font-semibold" style={{ color: COLORS.muted }}>{entry.petName}</span>
-            </div>
-          </div>
-          <div className="relative">
-            <button onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-full"
-              style={{ background: 'rgba(255,255,255,0.6)' }}>
-              <DotsThree weight="bold" className="w-4 h-4" style={{ color: COLORS.muted }} />
-            </button>
-            <AnimatePresence>
-              {showMenu && (
-                <motion.div initial={{ opacity: 0, scale: 0.9, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute right-0 top-8 rounded-2xl overflow-hidden z-10 pet-card-shadow"
-                  style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', minWidth: 120 }}>
-                  <button onClick={() => { onDelete(entry.id); setShowMenu(false); }}
-                    className="w-full px-4 py-3 text-left text-xs font-bold flex items-center gap-2"
-                    style={{ color: '#C4514A' }}>
-                    <Trash weight="bold" className="w-3.5 h-3.5" /> Delete
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <h3 className="font-display text-2xl font-black mb-2 leading-tight" style={{ color: COLORS.slate }}>
-          {entry.title}
-        </h3>
-        {entry.story && (
-          <p className="text-sm font-semibold leading-relaxed mb-3" style={{ color: '#6A5A50' }}>
-            {entry.story}
-          </p>
-        )}
-        <div className="flex items-center gap-1.5 mt-3">
-          <CalendarBlank weight="fill" className="w-3 h-3" style={{ color: eventType.color }} />
-          <span className="text-[10px] font-bold" style={{ color: COLORS.muted }}>{formattedDate}</span>
-          <div className="ml-auto px-2 py-0.5 rounded-full"
-            style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${eventType.border}` }}>
-            <span className="text-[9px] font-black uppercase tracking-wide" style={{ color: eventType.color }}>Big Moment</span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// Regular timeline entry (compact)
-const TimelineEntry = ({ entry, isLast, onDelete }) => {
-  const eventType = getEventType(entry.type);
-  const formattedDate = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const [showMenu, setShowMenu] = useState(false);
-
-  return (
-    <motion.div variants={itemVariants} className="flex gap-4 relative">
-      {/* Timeline line + dot */}
-      <div className="flex flex-col items-center" style={{ minWidth: 32 }}>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10"
-          style={{ background: eventType.bg, border: `2px solid ${eventType.border}` }}>
-          <eventType.Icon weight="fill" className="w-4 h-4" style={{ color: eventType.color }} />
-        </div>
-        {!isLast && (
-          <div className="w-0.5 flex-1 mt-1" style={{ background: '#EDE3D8', minHeight: 32 }}></div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 pb-6">
-        <div className="p-4 rounded-[20px] relative"
-          style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
-          <div className="flex justify-between items-start">
-            <div className="flex-1 pr-2">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: eventType.color }}>
-                  {eventType.label}
-                </span>
-                {entry.petName && (
-                  <span className="text-[9px] font-semibold" style={{ color: COLORS.muted }}>· {entry.petName}</span>
-                )}
-              </div>
-              <p className="font-black text-sm leading-snug" style={{ color: COLORS.slate }}>{entry.title}</p>
-              {entry.story && (
-                <p className="text-xs font-semibold mt-1.5 leading-relaxed" style={{ color: COLORS.muted }}>{entry.story}</p>
-              )}
-            </div>
-            <div className="relative flex-shrink-0">
-              <button onClick={() => setShowMenu(!showMenu)} className="p-1.5 rounded-full"
-                style={{ background: '#F5EDE0' }}>
-                <DotsThree weight="bold" className="w-3.5 h-3.5" style={{ color: COLORS.muted }} />
-              </button>
-              <AnimatePresence>
-                {showMenu && (
-                  <motion.div initial={{ opacity: 0, scale: 0.9, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="absolute right-0 top-8 rounded-2xl overflow-hidden z-10 pet-card-shadow"
-                    style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', minWidth: 110 }}>
-                    <button onClick={() => { onDelete(entry.id); setShowMenu(false); }}
-                      className="w-full px-4 py-3 text-left text-xs font-bold flex items-center gap-2"
-                      style={{ color: '#C4514A' }}>
-                      <Trash weight="bold" className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-2">
-            <CalendarBlank weight="fill" className="w-3 h-3" style={{ color: '#C4B8B0' }} />
-            <span className="text-[10px] font-semibold" style={{ color: '#C4B8B0' }}>{formattedDate}</span>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// Empty state for Journey
-const JourneyEmptyState = ({ onAdd }) => (
-  <div className="flex flex-col items-center justify-center py-16 px-6">
-    <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-      className="w-24 h-24 rounded-full flex items-center justify-center mb-5"
-      style={{ background: 'linear-gradient(135deg, #FEF3E2, #FDDFA0)' }}>
-      <Path weight="fill" className="w-10 h-10" style={{ color: '#C4914A' }} />
-    </motion.div>
-    <h3 className="font-display text-2xl font-black mb-2 text-center" style={{ color: COLORS.slate }}>
-      Start the Journey
-    </h3>
-    <p className="text-sm font-semibold text-center mb-8 max-w-[240px] leading-relaxed" style={{ color: COLORS.muted }}>
-      Every milestone, funny moment, and health visit deserves to be remembered.
-    </p>
-    <motion.button whileTap={tapAnimation} onClick={onAdd}
-      className="px-7 py-4 rounded-full font-bold text-white flex items-center gap-2"
-      style={{ background: COLORS.terracotta, boxShadow: '0 4px 20px -6px rgba(196,113,74,0.5)' }}>
-      <Plus weight="bold" className="w-4 h-4" /> Add First Memory
-    </motion.button>
-  </div>
-);
-
-// Full Journey page
-const JourneyPage = ({ journeyEntries, savedPets, onAddEntry, onDeleteEntry }) => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [filterPet, setFilterPet] = useState('all');
-  const [filterType, setFilterType] = useState('all');
-
-  const uniquePetNames = [...new Set(savedPets.map(p => p.name).filter(Boolean))];
-
-  const filtered = journeyEntries
-    .filter(e => filterPet === 'all' || e.petName === filterPet)
-    .filter(e => filterType === 'all' || e.type === filterType)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  // Group entries by month/year
-  const grouped = filtered.reduce((acc, entry) => {
-    const d = new Date(entry.date);
-    const key = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(entry);
-    return acc;
-  }, {});
-
-  return (
-    <>
-      <div className="pb-28">
-        {/* Page header */}
-        <div className="pt-16 px-6 mb-5">
-          <div className="flex justify-between items-center mb-1">
-            <h1 className="font-display text-3xl font-black" style={{ color: COLORS.slate }}>Journey</h1>
-            <motion.button whileTap={tapAnimation} onClick={() => setShowAddModal(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-              style={{ background: COLORS.terracotta, boxShadow: '0 4px 16px -4px rgba(196,113,74,0.5)' }}>
-              <Plus weight="bold" className="w-5 h-5" />
-            </motion.button>
-          </div>
-          <p className="text-sm font-semibold" style={{ color: COLORS.muted }}>
-            {journeyEntries.length} {journeyEntries.length === 1 ? 'memory' : 'memories'} collected
-          </p>
-        </div>
-
-        {/* Stats strip */}
-        {journeyEntries.length > 0 && (
-          <div className="mx-6 mb-5 p-4 rounded-[24px] flex justify-between"
-            style={{ background: 'linear-gradient(135deg, #FEF3E2, #FDF6EC)', border: '1.5px solid #FDDFA0' }}>
-            {EVENT_TYPES.map(type => {
-              const count = journeyEntries.filter(e => e.type === type.id).length;
-              return (
-                <div key={type.id} className="flex flex-col items-center gap-1">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ background: type.bg, border: `1.5px solid ${type.border}` }}>
-                    <type.Icon weight="fill" className="w-4 h-4" style={{ color: type.color }} />
-                  </div>
-                  <span className="font-black text-sm" style={{ color: COLORS.slate }}>{count}</span>
-                  <span className="text-[8px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>
-                    {type.label.split(' ')[0]}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Filters */}
-        {journeyEntries.length > 0 && (
-          <div className="px-6 mb-5 space-y-2">
-            {/* Pet filter */}
-            {uniquePetNames.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                <button onClick={() => setFilterPet('all')}
-                  className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
-                  style={{
-                    background: filterPet === 'all' ? COLORS.slate : COLORS.cardBg,
-                    color: filterPet === 'all' ? 'white' : COLORS.muted,
-                    border: '1.5px solid #EDE3D8'
-                  }}>All pets</button>
-                {uniquePetNames.map(name => (
-                  <button key={name} onClick={() => setFilterPet(name)}
-                    className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
-                    style={{
-                      background: filterPet === name ? COLORS.slate : COLORS.cardBg,
-                      color: filterPet === name ? 'white' : COLORS.muted,
-                      border: '1.5px solid #EDE3D8'
-                    }}>{name}</button>
-                ))}
-              </div>
-            )}
-            {/* Type filter */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              <button onClick={() => setFilterType('all')}
-                className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all"
-                style={{
-                  background: filterType === 'all' ? COLORS.terracotta : COLORS.cardBg,
-                  color: filterType === 'all' ? 'white' : COLORS.muted,
-                  border: '1.5px solid #EDE3D8'
-                }}>All types</button>
-              {EVENT_TYPES.map(type => (
-                <button key={type.id} onClick={() => setFilterType(type.id)}
-                  className="px-3 py-1.5 rounded-full text-[10px] font-bold flex-shrink-0 transition-all flex items-center gap-1"
-                  style={{
-                    background: filterType === type.id ? type.color : COLORS.cardBg,
-                    color: filterType === type.id ? 'white' : COLORS.muted,
-                    border: `1.5px solid ${filterType === type.id ? type.color : '#EDE3D8'}`
-                  }}>
-                  <type.Icon weight="fill" className="w-3 h-3" />
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        {journeyEntries.length === 0 ? (
-          <JourneyEmptyState onAdd={() => setShowAddModal(true)} />
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-12 opacity-60">
-            <p className="text-sm font-bold" style={{ color: COLORS.muted }}>No entries match this filter.</p>
-          </div>
-        ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="px-6">
-            {Object.entries(grouped).map(([monthYear, entries]) => (
-              <div key={monthYear} className="mb-6">
-                {/* Month divider */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-px flex-1" style={{ background: '#EDE3D8' }}></div>
-                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full"
-                    style={{ background: '#EDE3D8', color: COLORS.muted }}>
-                    {monthYear}
-                  </span>
-                  <div className="h-px flex-1" style={{ background: '#EDE3D8' }}></div>
-                </div>
-
-                {/* Entries for this month */}
-                {entries.map((entry, i) =>
-                  entry.isBig
-                    ? <MilestoneCard key={entry.id} entry={entry} onDelete={onDeleteEntry} />
-                    : <TimelineEntry key={entry.id} entry={entry} isLast={i === entries.length - 1} onDelete={onDeleteEntry} />
-                )}
-              </div>
-            ))}
-          </motion.div>
-        )}
-      </div>
-
-      <AnimatePresence>
-        {showAddModal && (
-          <AddJourneyModal
-            savedPets={savedPets}
-            onClose={() => setShowAddModal(false)}
-            onSave={onAddEntry}
-          />
-        )}
-      </AnimatePresence>
-    </>
-  );
-};
-
 // --- MAIN APP ---
 export default function App() {
   const [view, setView] = useState('home');
@@ -1452,11 +1417,9 @@ export default function App() {
   const [userProfile, setUserProfile] = useState(() => JSON.parse(localStorage.getItem('pawerful_profile') || '{"name": "Tia & Pika", "bio": "Living the chaotic pet life.", "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Tia"}'));
   const [journeyEntries, setJourneyEntries] = useState(() => JSON.parse(localStorage.getItem('pawerful_journey') || "[]"));
   const [streak, setStreak] = useState(0);
-  // FIX #2: Track if user already checked in today (streak logic is app-load only)
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // FIX #10: Inject global styles only once, cleanly
   useEffect(() => {
     const style = document.createElement('style');
     style.id = 'pawerful-global-styles';
@@ -1470,24 +1433,22 @@ export default function App() {
     };
   }, []);
 
-  // FIX #2 & #5: Proper streak logic — only increments once per day on app load
   useEffect(() => {
     const lastVisit = localStorage.getItem('last_visit_date');
     const today = new Date().toDateString();
     let currentStreak = parseInt(localStorage.getItem('vibe_streak') || "0");
 
     if (lastVisit === today) {
-      // Already visited today — just load the streak, don't increment
       setCheckedInToday(true);
     } else {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       if (lastVisit === yesterday.toDateString()) {
-        currentStreak += 1; // Consecutive day — grow streak
+        currentStreak += 1;
       } else if (!lastVisit) {
-        currentStreak = 1; // First ever visit
+        currentStreak = 1;
       } else {
-        currentStreak = 1; // Broke the streak — restart at 1 (not 0, since they're here now)
+        currentStreak = 1;
       }
       localStorage.setItem('vibe_streak', currentStreak);
       localStorage.setItem('last_visit_date', today);
@@ -1517,7 +1478,6 @@ export default function App() {
   const [rawFile, setRawFile] = useState(null);
   const [petDetails, setPetDetails] = useState({});
   const [aiResult, setAiResult] = useState(null);
-  // FIX #8: Track if scanning has timed out
   const [scanError, setScanError] = useState(false);
   const scanTimeoutRef = useRef(null);
 
@@ -1534,7 +1494,6 @@ export default function App() {
     setScanError(false);
     setView('scanning');
 
-    // FIX #8: Set a 20-second timeout so scanning never gets stuck
     scanTimeoutRef.current = setTimeout(() => {
       setScanError(true);
       setView('form');
@@ -1573,37 +1532,43 @@ export default function App() {
     try {
       let data;
       if (rawFile) {
-        // 🔥 新方法：调用Vercel serverless function
-        const imageBase64 = await fileToBase64(rawFile);
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         
-        console.log(`[Frontend] Calling API for ${mode} analysis...`);
-        
-        const response = await fetch('/api/analyze-pet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageBase64,
-            petType: mode
-          })
-        });
+        if (isDevelopment) {
+          console.log('[Frontend] Local dev mode - using fallback');
+          await new Promise(res => setTimeout(res, 2000));
+          data = selectedFallback;
+        } else {
+          const imageBase64 = await fileToBase64(rawFile);
+          
+          console.log(`[Frontend] Calling API for ${mode} analysis...`);
+          
+          const response = await fetch('/api/analyze-pet', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imageBase64,
+              petType: mode
+            })
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'API request failed');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'API request failed');
+          }
+
+          const result = await response.json();
+          console.log(`[Frontend] Got response:`, result.requestId, result.data.breed);
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Analysis failed');
+          }
+
+          data = result.data;
         }
-
-        const result = await response.json();
-        console.log(`[Frontend] Got response:`, result.requestId, result.data.breed);
-        
-        if (!result.success) {
-          throw new Error(result.error || 'Analysis failed');
-        }
-
-        data = result.data;
       } else {
-        // 本地开发fallback
         await new Promise(res => setTimeout(res, 1500));
         data = selectedFallback;
       }
@@ -1619,7 +1584,6 @@ export default function App() {
     } catch (error) {
       console.error('[Frontend] Analysis error:', error);
       clearTimeout(scanTimeoutRef.current);
-      // 如果API失败，显示错误并使用fallback
       setScanError(true);
       setTimeout(() => setScanError(false), 3000);
       setAiResult(selectedFallback);
@@ -1627,9 +1591,8 @@ export default function App() {
     }
   };
 
-  // FIX #3: Generate stable ID at save time, store it with the pet
   const handleSavePet = (petData) => {
-    const stableId = Math.floor(Math.random() * 9000) + 1000; // Generated ONCE here
+    const stableId = Math.floor(Math.random() * 9000) + 1000;
     setSavedPets([{
       id: Date.now(),
       stableId,
@@ -1656,7 +1619,6 @@ export default function App() {
     <div className="min-h-screen w-full flex items-center justify-center py-10 px-4"
       style={{ background: 'linear-gradient(135deg, #D4C5B5 0%, #E8D8C8 50%, #D0C0A8 100%)', fontFamily: 'Nunito, sans-serif' }}>
       
-      {/* Decorative background blobs */}
       <div className="fixed top-20 left-10 w-64 h-64 rounded-full blur-3xl opacity-40 pointer-events-none"
         style={{ background: '#E8C4A0' }}></div>
       <div className="fixed bottom-20 right-10 w-80 h-80 rounded-full blur-3xl opacity-30 pointer-events-none"
@@ -1667,13 +1629,11 @@ export default function App() {
         
         <StatusBar />
 
-        {/* Ambient color blobs inside phone */}
         <div className="absolute top-[-40px] left-[-40px] w-36 h-36 rounded-full blur-3xl opacity-35 pointer-events-none transition-colors duration-700"
           style={{ background: mode === 'dog' ? '#E8C0C0' : '#C0D8B8' }}></div>
         <div className="absolute bottom-[80px] right-[-20px] w-56 h-56 rounded-full blur-3xl opacity-20 pointer-events-none"
           style={{ background: mode === 'dog' ? '#C0D4E8' : '#E8D0C0' }}></div>
 
-        {/* Fixed top header for home view */}
         {view === 'home' && (
           <div className="absolute top-0 left-0 right-0 z-40 pt-14 pb-3 px-6"
             style={{ background: 'rgba(253,246,236,0.88)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(237,227,216,0.6)' }}>
@@ -1681,7 +1641,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Fixed top header for result view */}
         {view === 'result' && (
           <div className="absolute top-0 left-0 right-0 z-40 pt-14 pb-4 px-6 flex items-center justify-between"
             style={{ background: 'rgba(253,246,236,0.95)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #EDE3D8' }}>
@@ -1695,7 +1654,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Scrolling mini profile header for profile view */}
         {view === 'profile' && (
           <div className={`absolute top-0 left-0 right-0 z-40 pt-16 pb-3 px-6 flex items-center justify-between transition-opacity duration-300 ${isScrolled ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
             style={{ background: 'rgba(253,246,236,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #EDE3D8' }}>
@@ -1716,7 +1674,6 @@ export default function App() {
           </div>
         )}
 
-        {/* FIX #8: Scan error toast */}
         <AnimatePresence>
           {scanError && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -1728,7 +1685,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Main scrollable content */}
         <div className="flex-1 overflow-y-auto scrollbar-hide relative z-10 h-full" onScroll={handleMainScroll}>
           <div className={`${(view === 'home' || view === 'result') ? 'pt-[88px]' : view === 'journey' ? 'pt-4' : ''} px-6 h-full`}>
 
@@ -1809,7 +1765,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom navigation bar */}
         <div className="absolute bottom-6 left-6 right-6 flex justify-between items-center z-50">
           <div className="w-full rounded-full px-7 py-2 h-16 flex justify-between items-center relative"
             style={{ background: COLORS.cardBg, boxShadow: '0 8px 32px -8px rgba(100,60,20,0.22)', border: '1.5px solid #EDE3D8' }}>
@@ -1827,7 +1782,6 @@ export default function App() {
                 style={{ color: view === 'journey' ? COLORS.terracotta : '#C4B8B0' }}>Journey</span>
             </motion.button>
 
-            {/* Center scan button */}
             <label className="relative -top-6 cursor-pointer">
               <input type="file" accept="image/*" onChange={(e) => {
                 if (e.target.files[0]) { handleUpload(e.target.files[0]); e.target.value = ''; }
@@ -1845,10 +1799,9 @@ export default function App() {
               <span className="text-[8px] font-bold transition-colors"
                 style={{ color: view === 'profile' ? COLORS.terracotta : '#C4B8B0' }}>Profile</span>
             </motion.button>
-
-
           </div>
         </div>
+
       </div>
     </div>
   );
