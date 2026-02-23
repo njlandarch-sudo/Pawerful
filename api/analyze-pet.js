@@ -16,6 +16,8 @@ export default async function handler(req, res) {
 
     // 防止缓存：每次请求都加上唯一ID和时间戳
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const petTypeHint = petType === 'dog' ? 'dog' : 'cat';
+    
     const prompt = `[Request ID: ${requestId}] [Timestamp: ${new Date().toISOString()}]
 
 You are analyzing a photo of a ${petTypeHint}. Look carefully at the SPECIFIC details in THIS exact image.
@@ -45,8 +47,6 @@ CRITICAL RULES:
 - All text must be in English
 - Values for humanSafe and dogSafe should be "green", "yellow", or "red"
 - Stats values should be numbers between 0-100`;
-
-    const petTypeHint = petType === 'dog' ? 'dog' : 'cat';
 
     console.log(`[${requestId}] 开始豆包2.0分析 ${petType}...`);
     console.log(`[${requestId}] API Key配置: ${process.env.VOLCENGINE_API_KEY ? '已配置' : '❌未配置'}`);
