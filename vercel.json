@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/analyze-pet.js": {
-      "maxDuration": 10
+      "regions": ["hkg1", "sin1", "iad1"]
     }
   }
 }

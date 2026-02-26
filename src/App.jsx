@@ -156,14 +156,24 @@ const generateShareCard = async (pet, petImage) => {
     ctx.closePath();
     ctx.fill();
 
-    // PAWERFUL logo text
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    // PAWERFUL logo image
+    const logoImg = new Image();
+    logoImg.src = '/MainLogo.png';
+    await new Promise((resolve) => { logoImg.onload = resolve; logoImg.onerror = resolve; setTimeout(resolve, 2000); });
+    ctx.save();
+    const logoSize = 60, logoX = 78, logoY = 58;
+    ctx.beginPath();
+    ctx.roundRect(logoX, logoY, logoSize, logoSize, 14);
+    ctx.clip();
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
     ctx.font = 'bold 28px Georgia, serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.textAlign = 'left';
-    ctx.fillText('🐾 PAWERFUL', 78, 95);
+    ctx.fillText('Pawerful', logoX + logoSize + 12, 95);
     ctx.font = '16px Helvetica, Arial, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.fillText('PET IDENTITY CARD', 78, 125);
+    ctx.fillText('PET IDENTITY CARD', logoX + logoSize + 12, 125);
 
     // ID badge on right
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
@@ -1385,10 +1395,7 @@ const AvatarEditorModal = ({ image, onClose, onSave }) => {
 const Header = ({ mode, onModeSwitch, streak, checkedInToday, onStreakClick }) => (
   <div className="flex justify-between items-center w-full">
     <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-lg shadow-md transition-colors duration-500"
-        style={{ background: mode === 'dog' ? '#E8A0A0' : '#7BAE8A', color: '#FDF6EC' }}>
-        P
-      </div>
+      <img src="/MainLogo.png" alt="Pawerful" className="w-8 h-8 rounded-xl shadow-md" />
       <span className="font-black text-lg tracking-tight" style={{ color: '#3D3530', fontFamily: 'Fraunces, serif' }}>Pawerful</span>
     </div>
     <div className="flex items-center gap-2">
