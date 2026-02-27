@@ -1773,20 +1773,10 @@ export default function App() {
     );
   }
 
-  // Auth screen
-  if (!session) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center py-10 px-4"
-        style={{ background: 'linear-gradient(135deg, #D4C5B5 0%, #E8D8C8 50%, #D0C0A8 100%)', fontFamily: 'Nunito, sans-serif' }}>
-        <style>{globalStyles}</style>
-        <div className="w-full max-w-[390px] h-[844px] rounded-[52px] shadow-2xl relative overflow-hidden"
-          style={{ background: COLORS.cream, border: '10px solid #2A2018' }}>
-          <StatusBar />
-          <AuthScreen onAuth={() => {}} />
-        </div>
-      </div>
-    );
-  }
+  // HACKATHON MODE: skip login, allow guest access
+  // After hackathon, remove the comment below to re-enable auth:
+  // if (!session) { return <AuthScreen /> }
+
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center py-10 px-4"
