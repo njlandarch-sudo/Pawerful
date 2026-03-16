@@ -21,7 +21,6 @@ const supabase = createClient(
 
 // --- GLOBAL STYLES ---
 const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap');
   
   * { font-family: 'Nunito', sans-serif; }
   .font-display { font-family: 'Fraunces', Georgia, serif; }
