@@ -1,23 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@supabase/supabase-js';
+
 import { 
   House, User, Scan, ShareNetwork, Heart, Gear, SquaresFour, 
   CaretLeft, PencilSimple, Plus, Lightning, 
   Moon, X, Sparkle, PawPrint, Fire, MagnifyingGlassPlus, MagnifyingGlassMinus, Check, FloppyDisk, Info, UsersThree, CalendarBlank, List,
   WifiHigh, BatteryFull, CellSignalFull, Ghost,
-  Path, Star, Heartbeat, Syringe, SmileyWink, Trophy, Camera, TextT, DotsThree, Trash,
-  GoogleLogo, EnvelopeSimple, LockSimple, ArrowRight, SignOut
+  Path, Star, Heartbeat, Syringe, SmileyWink, Trophy, Camera, TextT, DotsThree, Trash
 } from '@phosphor-icons/react';
 
-// ============================================
-// SUPABASE CLIENT
-// ============================================
-const supabase = createClient(
-  'https://dnjkbvubcgncgqhndyds.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuamtidnViY2duY2dxaG5keWRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQ1MzcsImV4cCI6MjA4Nzc0MDUzN30.OfexadyFMC8I6gtdXjOM16O9XzP917HLMQz5AIn2pkc'
-);
+
 
 // --- GLOBAL STYLES ---
 const globalStyles = `
@@ -345,161 +338,6 @@ const EVENT_TYPES = [
   { id: 'mood', label: 'Mood', Icon: Heartbeat, color: '#7BAE8A', bg: '#EEF7F1', border: '#B8DEC3' },
 ];
 const getEventType = (id) => EVENT_TYPES.find(t => t.id === id) || EVENT_TYPES[0];
-
-// ============================================
-// AUTH SCREEN
-// ============================================
-const AuthScreen = ({ onAuth }) => {
-  const [authMode, setAuthMode] = useState('welcome'); // welcome | email
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
-
-  const handleGoogle = async () => {
-    setLoading(true);
-    setError('');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
-    if (error) setError(error.message);
-    setLoading(false);
-  };
-
-  const handleEmail = async () => {
-    if (!email || !password) return;
-    setLoading(true);
-    setError('');
-    let result;
-    if (isLogin) {
-      result = await supabase.auth.signInWithPassword({ email, password });
-    } else {
-      result = await supabase.auth.signUp({ email, password });
-      if (!result.error) { setEmailSent(true); setLoading(false); return; }
-    }
-    if (result.error) setError(result.error.message);
-    setLoading(false);
-  };
-
-  if (emailSent) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full px-8 text-center">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
-          style={{ background: '#EEF7F1', border: '2px solid #B8DEC3' }}>
-          <EnvelopeSimple weight="fill" className="w-10 h-10" style={{ color: '#7BAE8A' }} />
-        </div>
-        <h2 className="font-display text-2xl font-black mb-2" style={{ color: COLORS.slate }}>Check your email</h2>
-        <p className="text-sm font-semibold mb-6" style={{ color: COLORS.muted }}>
-          We sent a confirmation link to <span style={{ color: COLORS.terracotta }}>{email}</span>
-        </p>
-        <button onClick={() => { setEmailSent(false); setAuthMode('email'); setIsLogin(true); }}
-          className="text-sm font-bold" style={{ color: COLORS.terracotta }}>
-          Back to sign in
-        </button>
-      </div>
-    );
-  }
-
-  if (authMode === 'email') {
-    return (
-      <div className="flex flex-col h-full px-6 pt-16 pb-10">
-        <button onClick={() => setAuthMode('welcome')} className="flex items-center gap-2 mb-8">
-          <CaretLeft weight="bold" className="w-5 h-5" style={{ color: COLORS.muted }} />
-          <span className="font-bold text-sm" style={{ color: COLORS.muted }}>Back</span>
-        </button>
-        <h2 className="font-display text-3xl font-black mb-2" style={{ color: COLORS.slate }}>
-          {isLogin ? 'Welcome back' : 'Create account'}
-        </h2>
-        <p className="text-sm font-semibold mb-8" style={{ color: COLORS.muted }}>
-          {isLogin ? 'Sign in to access your pets' : 'Start your Pawerful journey'}
-        </p>
-        {error && (
-          <div className="mb-4 px-4 py-3 rounded-2xl text-sm font-bold" style={{ background: '#FEE2E2', color: '#C4514A' }}>
-            {error}
-          </div>
-        )}
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-            style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
-            <EnvelopeSimple weight="bold" className="w-5 h-5" style={{ color: COLORS.muted }} />
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="flex-1 bg-transparent font-semibold text-sm outline-none"
-              style={{ color: COLORS.slate }} />
-          </div>
-          <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-            style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8' }}>
-            <LockSimple weight="bold" className="w-5 h-5" style={{ color: COLORS.muted }} />
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Password"
-              className="flex-1 bg-transparent font-semibold text-sm outline-none"
-              style={{ color: COLORS.slate }}
-              onKeyDown={e => e.key === 'Enter' && handleEmail()} />
-          </div>
-        </div>
-        <motion.button whileTap={tapAnimation} onClick={handleEmail}
-          disabled={loading || !email || !password}
-          className="w-full py-4 rounded-full font-bold text-white mb-4 flex items-center justify-center gap-2"
-          style={{ background: (!email || !password) ? '#C4B8B0' : COLORS.terracotta,
-            boxShadow: (!email || !password) ? 'none' : '0 4px 20px -6px rgba(196,113,74,0.5)' }}>
-          {loading ? '...' : isLogin ? 'Sign In' : 'Create Account'}
-          <ArrowRight weight="bold" className="w-4 h-4" />
-        </motion.button>
-        <button onClick={() => setIsLogin(!isLogin)}
-          className="text-center text-sm font-semibold" style={{ color: COLORS.muted }}>
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <span style={{ color: COLORS.terracotta, fontWeight: 800 }}>
-            {isLogin ? 'Sign up' : 'Sign in'}
-          </span>
-        </button>
-      </div>
-    );
-  }
-
-  // Welcome screen
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 relative overflow-hidden">
-        <img src="https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&q=80"
-          className="w-full h-full object-cover" />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(30,15,5,0.95) 0%, rgba(30,15,5,0.3) 60%, transparent 100%)' }}></div>
-        <div className="absolute top-14 left-6 flex items-center gap-2">
-          <img src="/MainLogo.png" alt="Pawerful" className="w-10 h-10 rounded-2xl shadow-lg" />
-          <span className="font-black text-xl text-white" style={{ fontFamily: 'Fraunces, serif' }}>Pawerful</span>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 p-8">
-          <h1 className="font-display text-5xl font-black text-white leading-[0.92] mb-3 tracking-tight">
-            Know your<br/>pet's vibe.
-          </h1>
-          <p className="text-white/70 font-semibold text-base mb-8">
-            Scan, save, and share your pet's personality with AI.
-          </p>
-          <div className="space-y-3">
-            <motion.button whileTap={tapAnimation} onClick={handleGoogle}
-              disabled={loading}
-              className="w-full py-4 rounded-full font-bold text-base flex items-center justify-center gap-3"
-              style={{ background: 'white', color: COLORS.slate, boxShadow: '0 4px 20px -6px rgba(0,0,0,0.3)' }}>
-              <GoogleLogo weight="bold" className="w-5 h-5" style={{ color: '#4285F4' }} />
-              Continue with Google
-            </motion.button>
-            <motion.button whileTap={tapAnimation} onClick={() => setAuthMode('email')}
-              className="w-full py-4 rounded-full font-bold text-base flex items-center justify-center gap-3"
-              style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: '1.5px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)' }}>
-              <EnvelopeSimple weight="bold" className="w-5 h-5" />
-              Continue with Email
-            </motion.button>
-          </div>
-          <p className="text-white/40 text-[10px] text-center mt-5 font-semibold">
-            By continuing, you agree to our Terms & Privacy Policy
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ============================================
 // JOURNEY COMPONENTS
@@ -1375,13 +1213,9 @@ const MyPage = ({ savedPets, userProfile, setUserProfile, onSignOut }) => {
   const filteredPets = activeTab === 'all' ? savedPets : collections[activeTab] || [];
   const petNames = Object.keys(collections);
   const formattedLikes = savedPets.length > 0 ? ((savedPets.length * 47) > 999 ? ((savedPets.length * 47) / 1000).toFixed(1) + 'k' : savedPets.length * 47) : '—';
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = () => {
     setUserProfile({ ...userProfile, name: tempName, bio: tempBio });
     setIsEditing(false);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('profiles').update({ name: tempName, bio: tempBio, updated_at: new Date().toISOString() }).eq('id', user.id);
-    }
   };
   const handleFileSelect = async (e) => {
     if (e.target.files[0]) { const base64 = await fileToBase64(e.target.files[0]); setTempAvatarImage(base64); setShowAvatarModal(true); e.target.value = null; }
@@ -1411,7 +1245,7 @@ const MyPage = ({ savedPets, userProfile, setUserProfile, onSignOut }) => {
                   style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: '#5A4A40' }}>Edit Profile</button>
               )}
               <button onClick={onSignOut} className="p-2 rounded-full" style={{ background: COLORS.cardBg, border: '1.5px solid #EDE3D8', color: '#5A4A40' }}>
-                <SignOut weight="bold" className="w-4 h-4" />
+                <Gear weight="bold" className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -1504,19 +1338,16 @@ const MyPage = ({ savedPets, userProfile, setUserProfile, onSignOut }) => {
 // MAIN APP
 // ============================================
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState('home');
   const [mode, setMode] = useState('cat');
   const [selectedTrend, setSelectedTrend] = useState(null);
-  const [savedPets, setSavedPets] = useState([]);
-  const [userProfile, setUserProfile] = useState({ name: 'Pet Parent', bio: 'Living the chaotic pet life.', avatar: '' });
-  const [journeyEntries, setJourneyEntries] = useState([]);
-  const [streak, setStreak] = useState(0);
-  const [checkedInToday, setCheckedInToday] = useState(false);
+  const [savedPets, setSavedPets] = useState(() => JSON.parse(localStorage.getItem('pawerful_pets') || '[]'));
+  const [userProfile, setUserProfile] = useState(() => JSON.parse(localStorage.getItem('pawerful_profile') || '{"name":"Pet Parent","bio":"Living the chaotic pet life.","avatar":""}'));
+  const [journeyEntries, setJourneyEntries] = useState(() => JSON.parse(localStorage.getItem('pawerful_journey') || '[]'));
+  const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('vibe_streak') || '0'));
+  const [checkedInToday, setCheckedInToday] = useState(() => localStorage.getItem('last_checkin_date') === new Date().toDateString());
   const [isScrolled, setIsScrolled] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false);
   const [scanError, setScanError] = useState(false);
 
   // Inject global styles
@@ -1530,110 +1361,26 @@ export default function App() {
     return () => { const el = document.getElementById('pawerful-global-styles'); if (el) document.head.removeChild(el); };
   }, []);
 
-  // Auth listener
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setAuthLoading(false);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Persist to localStorage
+  useEffect(() => { localStorage.setItem('pawerful_pets', JSON.stringify(savedPets)); }, [savedPets]);
+  useEffect(() => { localStorage.setItem('pawerful_profile', JSON.stringify(userProfile)); }, [userProfile]);
+  useEffect(() => { localStorage.setItem('pawerful_journey', JSON.stringify(journeyEntries)); }, [journeyEntries]);
 
-  // Load user data from Supabase when logged in
-  useEffect(() => {
-    if (!session?.user) return;
-    loadUserData();
-  }, [session]);
-
-  const loadUserData = async () => {
-    setDataLoading(true);
-    const userId = session.user.id;
-    try {
-      // Load profile
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (profile) {
-        setUserProfile({
-          name: profile.name || session.user.user_metadata?.full_name || 'Pet Parent',
-          bio: profile.bio || 'Living the chaotic pet life.',
-          avatar: profile.avatar_url || session.user.user_metadata?.avatar_url || ''
-        });
-      }
-      // Load pets
-      const { data: pets } = await supabase.from('pets').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-      if (pets) {
-        setSavedPets(pets.map(p => ({
-          id: p.id,
-          stableId: p.stable_id,
-          image: p.image_base64 || p.image_url,
-          name: p.name,
-          breed: p.breed,
-          mode: p.mode,
-          details: p.details,
-          stats: p.stats,
-          humanSafe: p.human_safe,
-          dogSafe: p.dog_safe,
-          diary: p.diary,
-          timestamp: p.created_at
-        })));
-      }
-      // Load journey
-      const { data: journey } = await supabase.from('journey_entries').select('*').eq('user_id', userId).order('date', { ascending: false });
-      if (journey) {
-        setJourneyEntries(journey.map(e => ({
-          id: e.id,
-          type: e.type,
-          petName: e.pet_name,
-          title: e.title,
-          story: e.story,
-          isBig: e.is_big,
-          date: e.date,
-          timestamp: e.created_at
-        })));
-      }
-      // Load streak
-      const { data: streakData } = await supabase.from('streaks').select('*').eq('user_id', userId).single();
-      if (streakData) {
-        setStreak(streakData.current_streak || 0);
-        const today = new Date().toDateString();
-        if (streakData.last_checkin_date) {
-          const lastDate = new Date(streakData.last_checkin_date).toDateString();
-          setCheckedInToday(lastDate === today);
-        }
-      }
-    } catch (e) { console.error('Error loading data:', e); }
-    setDataLoading(false);
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
+  const handleSignOut = () => {
     setSavedPets([]); setJourneyEntries([]); setStreak(0); setCheckedInToday(false);
+    localStorage.removeItem('pawerful_pets');
+    localStorage.removeItem('pawerful_journey');
+    localStorage.removeItem('vibe_streak');
+    localStorage.removeItem('last_checkin_date');
     setView('home');
   };
 
-  const handleAddJourneyEntry = async (entry) => {
+  const handleAddJourneyEntry = (entry) => {
     setJourneyEntries(prev => [entry, ...prev]);
-    if (session?.user) {
-      await supabase.from('journey_entries').insert({
-        user_id: session.user.id,
-        type: entry.type,
-        pet_name: entry.petName,
-        title: entry.title,
-        story: entry.story,
-        is_big: entry.isBig,
-        date: entry.date
-      });
-    }
   };
 
-  const handleDeleteJourneyEntry = async (id) => {
+  const handleDeleteJourneyEntry = (id) => {
     setJourneyEntries(prev => prev.filter(e => e.id !== id));
-    if (session?.user) {
-      await supabase.from('journey_entries').delete().eq('id', id).eq('user_id', session.user.id);
-    }
   };
 
   const [petImage, setPetImage] = useState(null);
@@ -1693,7 +1440,7 @@ export default function App() {
     }
   };
 
-  const handleSavePet = async (petData) => {
+  const handleSavePet = (petData) => {
     const stableId = petData.stableId || (Math.floor(Math.random() * 9000) + 1000);
     const newPet = {
       id: Date.now(),
@@ -1711,40 +1458,19 @@ export default function App() {
     };
     setSavedPets(prev => [newPet, ...prev]);
     setView('profile');
-    if (session?.user) {
-      await supabase.from('pets').insert({
-        user_id: session.user.id,
-        stable_id: stableId,
-        name: newPet.name,
-        breed: newPet.breed,
-        mode: newPet.mode,
-        image_base64: petImage,
-        human_safe: newPet.humanSafe,
-        dog_safe: newPet.dogSafe,
-        diary: newPet.diary,
-        stats: newPet.stats,
-        details: petDetails
-      });
-    }
   };
 
-  const handleCheckInComplete = async () => {
+  const handleCheckInComplete = () => {
     const today = new Date().toDateString();
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const lastCheckin = localStorage.getItem('last_checkin_date');
     let newStreak;
-    const lastDate = checkedInToday ? today : null;
-    if (lastDate === yesterday.toDateString()) { newStreak = streak + 1; }
-    else if (checkedInToday) { newStreak = streak; }
+    if (lastCheckin === yesterday.toDateString()) { newStreak = streak + 1; }
+    else if (lastCheckin === today) { newStreak = streak; }
     else { newStreak = 1; }
+    localStorage.setItem('vibe_streak', newStreak);
+    localStorage.setItem('last_checkin_date', today);
     setStreak(newStreak); setCheckedInToday(true); setShowCheckIn(false);
-    if (session?.user) {
-      await supabase.from('streaks').upsert({
-        user_id: session.user.id,
-        current_streak: newStreak,
-        last_checkin_date: new Date().toISOString().slice(0, 10),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
-    }
   };
 
   const [homeBg, setHomeBg] = useState("https://images.unsplash.com/photo-1513245543132-31f507417b26?w=600&q=80");
@@ -1755,26 +1481,6 @@ export default function App() {
   const [resultStableId] = useState(() => Math.floor(Math.random() * 9000) + 1000);
   const defaultData = { name: petDetails.name || "Unknown", breed: "Unknown", mode: "Scanning...", humanSafe: 'green', dogSafe: 'yellow', stats: [], squads: [], stableId: resultStableId };
   const finalPetData = aiResult ? { ...defaultData, ...aiResult, stableId: resultStableId } : defaultData;
-
-  // Loading screen
-  if (authLoading) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4C5B5 0%, #E8D8C8 50%, #D0C0A8 100%)' }}>
-        <div className="w-full max-w-[390px] h-[844px] rounded-[52px] flex items-center justify-center" style={{ background: COLORS.cream, border: '10px solid #2A2018' }}>
-          <div className="flex flex-col items-center gap-4">
-            <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-              <img src="/MainLogo.png" alt="Pawerful" className="w-16 h-16 rounded-[20px] shadow-lg" />
-            </motion.div>
-            <p className="font-bold text-sm" style={{ color: COLORS.muted }}>Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // HACKATHON MODE: skip login, allow guest access
-  // After hackathon, remove the comment below to re-enable auth:
-  // if (!session) { return <AuthScreen /> }
 
 
   return (
@@ -1842,13 +1548,7 @@ export default function App() {
                 </motion.div>
                 <motion.div variants={itemVariants}>
                   <div className="pb-28">
-                    {dataLoading ? (
-                      <div className="flex items-center justify-center py-8 opacity-50">
-                        <p className="text-sm font-bold" style={{ color: COLORS.muted }}>Loading your data...</p>
-                      </div>
-                    ) : (
-                      <TrendingCommunities onTrendClick={handleTrendClick} mode={mode} />
-                    )}
+                    <TrendingCommunities onTrendClick={handleTrendClick} mode={mode} />
                   </div>
                 </motion.div>
               </motion.div>
