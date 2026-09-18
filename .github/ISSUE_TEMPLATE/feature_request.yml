@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a focused improvement to Pawerful.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What need does this address?
+      description: Explain the user problem before describing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What would you like Pawerful to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Mention simpler approaches or workarounds you considered.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be interested in working on this change.
+

@@ -1,50 +1,63 @@
-**Repository Summary**
-- **Stack:** Vite + React (React 19) with Tailwind CSS. Entry points: [index.html](index.html) → [src/main.jsx](src/main.jsx) → [src/App.jsx](src/App.jsx).
-- **Purpose:** Single-page UI demo app (client-only). No backend services; mock data lives in `TRENDS_DATA` and `POSTS_DB` inside `src/App.jsx`.
+# Pawerful repository instructions
 
-**Big Picture / Architecture**
-- Single-page app served by Vite. Global styling via Tailwind; app components are implemented inline in `src/App.jsx` rather than split across many files.
-- Visual/UI logic, sample data, and simple image-upload flows are colocated in `src/App.jsx`. Treat this file as the primary surface for UI changes and experiments.
-- Integrations: uses `@google/generative-ai` client (instantiated with `import.meta.env.VITE_GEMINI_API_KEY`) — the app expects a Gemini API key in env to enable generative features.
+## Project summary
 
-**Developer workflows (commands)**
-- Start dev server: `npm run dev` (uses Vite with HMR).
-- Build for production: `npm run build`.
-- Preview production build: `npm run preview`.
-- Linting: `npm run lint` (ESLint configured in repo).
+Pawerful is an early-stage, mobile-first pet vibe scanner and memory journal. A user uploads a cat or dog photo, the browser compresses it, and `/api/analyze-pet` asks a multimodal provider for a structured, playful result. Profiles and journey entries are stored locally in the browser.
 
-**Important files to inspect or modify**
-- App entry: [index.html](index.html)
-- React mount: [src/main.jsx](src/main.jsx)
-- Main UI and logic: [src/App.jsx](src/App.jsx)
-- Build config: [vite.config.js](vite.config.js)
-- Tailwind config: [tailwind.config.js](tailwind.config.js)
-- Scripts & deps: [package.json](package.json)
+## Current stack
 
-**Project-specific conventions & patterns**
-- Single-file components: The project implements many components inside `src/App.jsx` (Header, TrendingCommunities, ShowroomHero, PetDetailsForm, etc.). When adding features, prefer either:
-  - adding a new small component inside `src/` and importing it from `src/App.jsx`, or
-  - splitting logically grouped components into `src/components/` if the change is large.
-- Styling: utility-first Tailwind classes are used everywhere (no CSS modules). Avoid introducing separate CSS unless necessary; extend Tailwind via `tailwind.config.js`.
-- Mock data and images: `TRENDS_DATA` and `POSTS_DB` are in-memory arrays inside `src/App.jsx`. For persistence or API integration, replace usage sites with fetch calls and keep the UI contract (objects with id, title, image, etc.).
-- Image handling: file inputs use `URL.createObjectURL(...)` for preview before any upload logic — maintain that approach for quick local previews.
+- React 18 and Vite 5
+- Tailwind CSS 3
+- Framer Motion
+- Phosphor Icons
+- Vercel Edge Function at `api/analyze-pet.js`
+- Gemini outside mainland China and Doubao in mainland China
 
-**Integration notes & env vars**
-- Gemini / Generative AI: `const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY)` is created in `src/App.jsx`. Provide `VITE_GEMINI_API_KEY` in a local `.env` file (Vite requires `VITE_` prefix) to enable these features.
-- Third-party icons: `@phosphor-icons/react` is used heavily. Keep imports consolidated (the file imports many icons at top of `src/App.jsx`).
+Entry path: `index.html` -> `src/main.jsx` -> `src/App.jsx`.
 
-**Editing guidelines for AI coding agents**
-- Make minimal, focused edits. This repo prefers cosmetic/UI tweaks and small feature additions rather than heavy refactors.
-- Preserve Tailwind class patterns and existing animation/utility choices (e.g., `rounded-[32px]`, `animate-in`, `group-hover:*`).
-- When adding new components, export defaults from new files and import them in `src/App.jsx`. Name files under `src/components/` when size warrants splitting.
-- Avoid adding large dependencies without stating trade-offs. New tools should be added to `package.json` and included in `devDependencies` if only used for development.
+## Important files
 
-**Examples (where to change common tasks)**
-- Change the primary app UI: edit [src/App.jsx](src/App.jsx).
-- Update dev/build commands: edit [package.json](package.json).
-- Toggle generative AI usage: look for `GoogleGenerativeAI` in [src/App.jsx](src/App.jsx) and guard calls behind availability of `import.meta.env.VITE_GEMINI_API_KEY`.
+- `src/App.jsx`: UI, state, mock feed data, image handling, local persistence, and most components
+- `api/analyze-pet.js`: server-side AI routing, prompt, response parsing, and validation
+- `public/MainLogo.png`: project logo
+- `package.json`: scripts and dependencies
+- `README.md`: setup and contributor-facing product overview
+- `.env.example`: names of required server-side environment variables
 
-**What this file intentionally does NOT cover**
-- Internal design decisions not visible in the repo (CI, deployment settings, or private API keys) — ask the maintainer for missing runtime secrets or infra details.
+## Runtime behavior
 
-If anything here is unclear or you'd like me to expand/merge specific wording with an existing guidance file, tell me which section to refine.
+- The client calls `POST /api/analyze-pet` with `imageBase64` and `petType`.
+- The edge function uses `req.geo.country`; `CN` selects Doubao and other countries select Gemini.
+- When geo data is missing, the current fallback is `CN`.
+- The provider must return JSON containing `breed`, `mode`, `humanSafe`, `dogSafe`, `stats`, and `diary`.
+- Pet records, user profile data, journey entries, and streak data use `localStorage`.
+- There is no current authentication or shared database.
+
+## Environment variables
+
+- `GEMINI_API_KEY`
+- `VOLCENGINE_API_KEY`
+
+Both are server-side secrets. Never add a `VITE_` prefix, expose them to client code, print their values, or commit real `.env` files.
+
+## Commands
+
+- `npm install`
+- `npm run dev` for UI-only Vite development
+- `npx vercel dev` for the UI plus `/api` route
+- `npm run build` before submitting a pull request
+- `npm run preview` to preview a production build
+
+Do not claim that a lint or test command exists unless it has first been added to `package.json`.
+
+## Editing guidance
+
+- Make small, focused changes and preserve the current user-facing behavior unless the issue says otherwise.
+- Match the established warm palette, rounded forms, mobile-first composition, and restrained motion.
+- Prefer existing dependencies and patterns.
+- `src/App.jsx` is large. Extract one coherent component at a time; do not perform a full rewrite as part of an unrelated feature.
+- Keep provider calls in server-side code.
+- Preserve the documented API response shape or update frontend code and documentation together.
+- Treat AI-generated breed, behavior, and safety output as entertainment, not authoritative advice.
+- Never use real user images or credentials in fixtures, issues, commits, or tests.
+
