@@ -25,17 +25,10 @@ Return ONLY a valid JSON object, no markdown, no extra text:
 }
 Rules: JSON only. English only. humanSafe/dogSafe must be green/yellow/red. Stats 0-100.`;
 
+import { parseAndValidateAIResponse, parseAIResponse } from './response-parser.js';
+
 // ─── Response parser (shared) ─────────────────────────────────────────────────
-function parseAIResponse(text) {
-  let clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try {
-    return JSON.parse(clean);
-  } catch {
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error('Failed to parse AI response');
-  }
-}
+export { parseAIResponse, parseAndValidateAIResponse };
 
 // ─── Doubao (Volcengine) ──────────────────────────────────────────────────────
 async function callDoubao(imageUrl, petTypeHint) {
@@ -67,7 +60,7 @@ async function callDoubao(imageUrl, petTypeHint) {
   const result = await res.json();
   const text = result.choices?.[0]?.message?.content;
   if (!text) throw new Error('Doubao returned empty response');
-  return parseAIResponse(text);
+  return parseAndValidateAIResponse(text);
 }
 
 // ─── Google Gemini Flash ──────────────────────────────────────────────────────
@@ -105,7 +98,7 @@ async function callGemini(imageBase64, petTypeHint) {
   const result = await res.json();
   const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini returned empty response');
-  return parseAIResponse(text);
+  return parseAndValidateAIResponse(text);
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
